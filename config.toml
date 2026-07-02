@@ -1,0 +1,34 @@
+# hi-bench configuration: the test suite (models) and cost assumptions.
+
+[bench]
+# Runs per model (Harbor's -k / --n-attempts). More runs -> better latency averages.
+attempts = 5
+# Concurrent trials (Harbor's -n). Keep modest to avoid provider rate limits.
+concurrency = 4
+
+# The "test suite": the models to benchmark. Names are LiteLLM identifiers.
+# Uncomment / edit to match the providers you have API keys for.
+[models]
+list = [
+    "anthropic/claude-haiku-4-5-20251001",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-fable-5",
+    # "openai/gpt-5.4",
+    # "gemini/gemini-2.5-flash",
+]
+
+# Models used by `make smoke` — offline, no API keys, no network.
+mock_list = [
+    "mock/fast-cheap",
+    "mock/slow-pricey",
+]
+
+[cost]
+# "User waiting cost" prices the developer's time spent waiting for the answer.
+# per_second = annual_salary_usd / (work_hours_per_year * 3600)
+#
+# Default: ~US average software developer total comp. Adjust to taste; the raw
+# per-run data in sqlite is assumption-free, so only the report changes.
+annual_salary_usd = 120000
+work_hours_per_year = 2080   # 40 h/week * 52 weeks

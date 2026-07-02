@@ -1,0 +1,11 @@
+.venv/
+jobs/
+data/
+.env
+report.txt
+__pycache__/
+*.pyc
+
+# report.html is committed as the published result artifact (see README)
+
+.DS_Store
