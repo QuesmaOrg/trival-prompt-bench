@@ -1,10 +1,13 @@
 .venv/
 jobs/
-data/
 .env
 report.txt
 __pycache__/
 *.pyc
+
+# Ignore data/ transients but commit the results DB as a published artifact.
+data/*
+!data/trivial_prompt_bench.db
 
 # report.html is committed as the published result artifact (see README)
 

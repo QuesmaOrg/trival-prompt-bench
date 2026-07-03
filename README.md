@@ -14,43 +14,67 @@ is the cost, not the tokens.**
 
 ## 📊 Results
 
-**Open [`report.html`](report.html)** for the full interactive report — one stacked-bar
-graph per task (🟧 time wasted + 🟦 token cost), per-model tables, and hover details.
+**Open [`report.html`](report.html)** for the full interactive report — one bar graph
+per task (LLM cost by default, toggle to add 🟧 time wasted), per-model tables, and
+hover details.
 
-Latest run — 4 Anthropic models, 5 runs each, 2 tasks (40 trials, 0 errors),
-salary $120k/yr = $0.016026/sec:
+Latest run — 4 Anthropic models, 5 runs each, 4 tasks = **80 agentic trials** via the
+Terminus agent, all in the same git-repo environment, salary $120k/yr = $0.016026/sec.
+Columns: `err` = failed runs (excluded from averages), `tools` = avg tool calls,
+`lat` = transcript LLM latency, `total` = LLM + waiting cost per run.
 
-### Task "Hi"
-| Model | avg latency | LLM $/run | waiting $/run | **total $/run** |
+### `commit` — prompt "commit" (graded: **100% pass, all models**)
+| Model | err | tools | avg lat | total $/run |
 |---|--:|--:|--:|--:|
-| claude-haiku-4-5 | 1.01s | $0.000087 | $0.016251 | **$0.016338** |
-| claude-opus-4-8  | 1.51s | $0.000395 | $0.024265 | **$0.024660** |
-| claude-sonnet-5  | 2.63s | $0.000225 | $0.042164 | **$0.042389** |
-| claude-fable-5   | 4.84s | $0.001630 | $0.077609 | **$0.079239** |
+| claude-haiku-4-5 | 0 | 4.6 | 6.8s | **$0.1150** |
+| claude-sonnet-5  | 0 | 9.6 | 15.3s | **$0.2796** |
+| claude-opus-4-8  | 0 | 8.6 | 21.6s | **$0.4070** |
+| claude-fable-5   | 0 | 7.2 | 31.1s | **$0.5856** |
 
-### Task "Thank you"
-| Model | avg latency | LLM $/run | waiting $/run | **total $/run** |
+### `hi` — prompt "Hi"
+| Model | err | tools | avg lat | total $/run |
 |---|--:|--:|--:|--:|
-| claude-haiku-4-5 | 1.07s | $0.000114 | $0.017118 | **$0.017232** |
-| claude-sonnet-5  | 1.52s | $0.000396 | $0.024282 | **$0.024678** |
-| claude-opus-4-8  | 2.93s | $0.000645 | $0.046893 | **$0.047538** |
-| claude-fable-5   | 5.19s | $0.004390 | $0.083140 | **$0.087530** |
+| claude-fable-5   | 0 | 2.8 | 10.7s | **$0.2037** |
+| claude-opus-4-8  | 0 | 10.2 | 23.4s | **$0.4369** |
+| claude-sonnet-5  | 0 | 32.2 | 45.5s | **$0.8300** |
+| claude-haiku-4-5 | 4 | 22.0 | 48.4s | **$0.8344** |
 
-**Overall spend across all runs: $1.70**
+### `thank-you` — prompt "Thank you"
+| Model | err | tools | avg lat | total $/run |
+|---|--:|--:|--:|--:|
+| claude-haiku-4-5 | 2 | 5.7 | 12.4s | **$0.2119** |
+| claude-fable-5   | 0 | 2.0 | 12.3s | **$0.2252** |
+| claude-opus-4-8  | 0 | 9.6 | 26.5s | **$0.4925** |
+| claude-sonnet-5  | 0 | 15.6 | 33.7s | **$0.6089** |
+
+### `wtf` — prompt "WTF"
+| Model | err | tools | avg lat | total $/run |
+|---|--:|--:|--:|--:|
+| claude-haiku-4-5 | 0 | 18.0 | 21.2s | **$0.3659** |
+| claude-sonnet-5  | 0 | 33.4 | 54.2s | **$0.9843** |
+| claude-opus-4-8  | 0 | 23.0 | 55.0s | **$1.0255** |
+| claude-fable-5   | 5 | — | — | **failed 5/5** |
+
+**Overall spend across all 80 runs: $34.27**
 
 ### What the numbers say
-- **Latency dominates, not tokens.** Waiting cost is **150–187×** the API cost. The
-  total-cost ranking is essentially a latency ranking.
-- **Haiku wins both tasks** by being the fastest — cheapest total cost by a wide margin.
-- **Ranking flips between tasks.** Opus beat Sonnet on "Hi" but lost on "Thank you"
-  (its p95 spiked to 7.84s). Same models, different order — which is exactly why the
-  report draws a separate graph per task.
-- **Fable 5 is the outlier** — slowest and priciest, and it wrote the longest replies
-  (85.8 output tokens on "Thank you" vs ~15–25 for the others).
+- **The prompt is the cost driver.** Same environment, same models — only the prompt
+  differs, yet total cost per run swings **~10×** (from `commit` at $0.12 to `wtf` at
+  $1.03). A clear instruction (`commit`) is cheap and 100% reliable; a bare
+  interjection (`WTF`) makes the agent thrash.
+- **Under-specified prompts blow up.** `hi`/`wtf` drop the agent into a repo with a
+  pending change and no clear task, so it explores: Sonnet spent **32 tool calls / 45s**
+  on "Hi". More tool calls → more latency → more cost.
+- **Latency still dominates** the bill (waiting cost ≫ token cost), so the ranking is
+  essentially a latency/tool-call ranking.
+- **Trivial prompts are flaky as agent tasks.** Haiku errored 4/5 on "Hi" and 2/5 on
+  "Thank you"; **Fable failed all 5 "WTF" runs**. These are agent failures, not bench
+  bugs (see the `err` column).
 
-> Numbers are a point-in-time latency sample; network/load shifts them run to run.
-> The salary assumption drives the totals — retune `config.toml [cost]` and re-run
-> `make report-html` (no re-benchmarking needed; raw sqlite data is assumption-free).
+> Numbers are a point-in-time sample; network/load and agent nondeterminism shift them
+> run to run (small n=5, and errored runs are excluded from averages). The salary
+> assumption drives the totals — retune `config.toml [cost]` and re-run `make
+> report-html` (no re-benchmarking needed; raw sqlite data is assumption-free).
 
 ## Run it yourself
 
@@ -79,8 +103,59 @@ data/trivial_prompt_bench.db       sqlite results (git-ignored)
 report.html            Committed report artifact
 ```
 
-Add a task by copying a `tasks/<name>/` dir and changing `instruction.md` — the runner
-discovers it automatically and the report gains a graph for it, no code changes.
+## Contributing a task
+
+Tasks are the unit of contribution. **Every task shares the same environment and
+differs only in its prompt** — that's the whole design: the prompt is the one variable,
+so differences in cost/latency are attributable to the prompt (and the model), not the
+setup.
+
+### Task structure
+
+```
+tasks/<name>/
+├── task.toml              # name = "trivial-prompt-bench/<name>" (+ optional [metadata])
+├── instruction.md         # THE PROMPT — the only file you change for a new task
+├── environment/
+│   ├── Dockerfile         # identical across tasks — do not edit (keeps tasks comparable)
+│   └── build_repo.sh      # identical — builds the shared git project the agent runs in
+├── tests/test.sh          # verifier; trivial tasks use the always-pass one
+└── solution/solve.sh      # reference ("oracle") solution
+```
+
+Every task's container is the same: a small git repo with history and one uncommitted
+change. The agent (Terminus by default) is handed your prompt inside that repo. The
+runner **auto-discovers** any `tasks/*/task.toml`, so no code changes are needed.
+
+### Add a task (clone the `hi` task, change the prompt, open a PR)
+
+```bash
+# 1. Clone the simplest task
+cp -r tasks/hi tasks/goodbye
+
+# 2. Change the prompt — this is the only content that differs between trivial tasks
+echo "Goodbye" > tasks/goodbye/instruction.md
+
+# 3. Rename the task so it's unique
+#    edit tasks/goodbye/task.toml -> name = "trivial-prompt-bench/goodbye"
+
+# 4. Leave environment/ and tests/ untouched (shared setup, always-pass verifier)
+
+# 5. Run it and eyeball the report
+make bench          # discovers goodbye automatically, runs it across all models
+make report-html    # regenerate report.html — a new graph appears for your task
+
+# 6. Commit and open a PR
+git checkout -b task/goodbye
+git add tasks/goodbye report.html
+git commit -m "Add 'goodbye' task"
+git push -u origin task/goodbye
+gh pr create --fill
+```
+
+That's it for a trivial-prompt task. If your task needs the agent to *do* something
+(like `commit` does), set `agent`/`verify` in `task.toml [metadata]` and write a real
+`tests/test.sh` — see `tasks/commit/` as the worked example.
 
 ## Make targets
 
