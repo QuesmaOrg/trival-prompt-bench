@@ -10,7 +10,7 @@ export PATH := $(BIN):$(PATH)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup smoke bench ingest analyze report report-file report-html clean distclean check-docker
+.PHONY: help setup all smoke bench ingest analyze report report-file report-html clean distclean check-docker
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -22,6 +22,8 @@ $(VENV): pyproject.toml ## Create the virtualenv (uv, pinned Python)
 setup: $(VENV) ## Create venv and install harbor + this package (editable)
 	uv pip install --python $(PY) -e .
 	@echo "Setup complete. Copy .env.example to .env and add API keys for real runs."
+
+all: bench report-html ## Full pipeline: bench (ingest + failure analysis) then write report.html
 
 smoke: ## End-to-end run with mock models — no API keys, no network (needs Docker)
 	$(PY) -m trivial_prompt_bench.run --mock
