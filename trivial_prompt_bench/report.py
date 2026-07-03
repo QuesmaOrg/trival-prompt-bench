@@ -159,7 +159,8 @@ def _fmt_num(x: float | None) -> str:
     return "-" if x is None else f"{x:.1f}"
 
 
-def render(tasks: list[TaskStats], cfg) -> str:
+def render(tasks: list[TaskStats], cfg, analyses: dict | None = None) -> str:
+    analyses = analyses or {}
     lines: list[str] = []
     lines.append("trivial-prompt-bench report")
     lines.append("=" * 96)
@@ -190,6 +191,9 @@ def render(tasks: list[TaskStats], cfg) -> str:
         task_total = sum(s.sum_total_cost for s in t.models)
         grand += task_total
         lines.append(f"{'  task total spend (all runs)':<71}{_fmt_usd(task_total):>44}")
+        fa = analyses.get(t.task)
+        if fa:
+            lines.append(f"  Failure analysis ({fa['n_failures']} failed): {fa['analysis']}")
 
     lines.append("")
     lines.append("=" * 96)
@@ -224,10 +228,16 @@ def main() -> None:
             print("No runs in the database yet. Run `make smoke` or `make bench` first.")
             return
         tasks = compute_stats_by_task(conn, cfg.salary_usd_per_second)
+        analyses = {
+            r["task_name"]: dict(r)
+            for r in conn.execute(
+                "SELECT task_name, n_failures, analysis, model, generated_at FROM failure_analysis"
+            )
+        }
     finally:
         conn.close()
 
-    text = render(tasks, cfg)
+    text = render(tasks, cfg, analyses)
     print(text)
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -236,7 +246,7 @@ def main() -> None:
     if args.html is not None:
         args.html.parent.mkdir(parents=True, exist_ok=True)
         generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
-        args.html.write_text(render_html(tasks, cfg, generated_at))
+        args.html.write_text(render_html(tasks, cfg, generated_at, analyses))
         print(f"Wrote HTML report to {args.html}")
 
 

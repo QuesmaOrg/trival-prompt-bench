@@ -10,7 +10,7 @@ export PATH := $(BIN):$(PATH)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup smoke bench ingest report report-file report-html clean distclean check-docker
+.PHONY: help setup smoke bench ingest analyze report report-file report-html clean distclean check-docker
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -34,6 +34,9 @@ bench: check-docker ## Run the real model list from config.toml, ingest into sql
 ingest: ## Ingest a specific job dir: make ingest JOB=jobs/<name>
 	@test -n "$(JOB)" || (echo "Usage: make ingest JOB=jobs/<name>" && exit 1)
 	$(PY) -m trivial_prompt_bench.ingest $(JOB)
+
+analyze: ## Generate the per-task failure analysis (Claude call -> sqlite)
+	$(PY) -m trivial_prompt_bench.analyze
 
 report: ## Print the cost/latency report from sqlite
 	$(PY) -m trivial_prompt_bench.report

@@ -24,6 +24,11 @@ mock_list = [
     "mock/slow-pricey",
 ]
 
+[analysis]
+# Model used to generate the short per-task failure analysis (see `make analyze`).
+# A LiteLLM identifier; needs the matching API key in .env.
+model = "anthropic/claude-haiku-4-5-20251001"
+
 [cost]
 # "User waiting cost" prices the developer's time spent waiting for the answer.
 # per_second = annual_salary_usd / (work_hours_per_year * 3600)

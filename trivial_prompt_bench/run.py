@@ -149,7 +149,20 @@ def main() -> None:
         else:
             print(f"Job directory {job_dir} not found; nothing to ingest for this task.")
 
-    print(f"\nIngested {total} trial(s) into {args.db}. Run `make report` to see results.")
+    print(f"\nIngested {total} trial(s) into {args.db}.")
+
+    # Generate the per-task failure analysis (Claude call -> db). Best-effort: a
+    # missing API key or provider hiccup shouldn't fail the whole run. Skipped for
+    # --mock (no real failures worth analyzing, and mocks never error).
+    if not args.mock:
+        try:
+            from trivial_prompt_bench.analyze import generate_failure_analyses
+            n = generate_failure_analyses(args.db, cfg.analysis_model, args.env_file)
+            print(f"Failure analysis: wrote {n} note(s)." if n else "Failure analysis: no failures.")
+        except Exception as exc:
+            print(f"Failure analysis skipped: {exc}")
+
+    print("Run `make report` (or `make report-html`) to see results.")
 
 
 if __name__ == "__main__":

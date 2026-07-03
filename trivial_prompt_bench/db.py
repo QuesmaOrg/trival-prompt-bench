@@ -44,6 +44,16 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model);
 CREATE INDEX IF NOT EXISTS idx_runs_job ON runs(job_name);
+
+-- One short, LLM-generated root-cause note per task that had failed runs.
+-- Written by trivial_prompt_bench.analyze; the report only reads it.
+CREATE TABLE IF NOT EXISTS failure_analysis (
+    task_name    TEXT PRIMARY KEY,
+    n_failures   INTEGER,
+    analysis     TEXT,
+    model        TEXT,          -- the model used to generate the analysis
+    generated_at TEXT
+);
 """
 
 RUN_COLUMNS = [

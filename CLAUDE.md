@@ -40,6 +40,7 @@ trivial_prompt_bench/agent.py         HiAgent — single-LLM-call agent, used ON
 trivial_prompt_bench/run.py           Runs every task (via its chosen agent) across the models, ingests
 trivial_prompt_bench/ingest.py        Parses jobs/<job>/<trial>/result.json -> sqlite
 trivial_prompt_bench/db.py            sqlite schema + connection helpers
+trivial_prompt_bench/analyze.py       Claude call -> per-task failure analysis, stored in sqlite
 trivial_prompt_bench/report.py        Reads sqlite, prints/writes the cost/latency report
 trivial_prompt_bench/report_html.py   Self-contained HTML report (one stacked bar graph per task)
 config.toml               Model list (the "test suite") + salary assumptions
@@ -92,6 +93,17 @@ The `tool calls` column is `n_tool_calls`: at ingest we read the agent's ATIF
 transcript (`<trial>/agent/trajectory.json`) and sum `tool_calls` across its steps
 (includes real commands like `bash_command` plus the `mark_task_complete` marker;
 NULL for HiAgent/mock runs, which write no trajectory).
+
+### Failure analysis (below each task's table)
+
+`trivial_prompt_bench/analyze.py` makes **one Claude call per task that had failed
+runs** — it feeds the failed runs (model, error, tool calls, latency) to the model
+(`config.toml [analysis].model`, default Haiku) and asks for a ≤3-sentence root cause,
+then stores it in the `failure_analysis` table (keyed by task_name). This is the ONLY
+LLM call outside a bench run. `make bench` runs it automatically after ingest (skipped
+for `--mock`); `make analyze` re-runs it standalone. The report **only fetches and
+formats** these notes — it never calls an LLM. In both the text and HTML reports the
+note appears right below the task's result table; tasks with no failures get no note.
 
 Generate it with `make report-html` (writes `report.html`). Chart colors are the
 dataviz reference palette's slots 1 (blue) and 8 (orange), validated for CVD and

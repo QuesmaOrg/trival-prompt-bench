@@ -96,6 +96,11 @@ _TEMPLATE = r"""<!doctype html>
             color: var(--text-primary); user-select: none; }
   .toggle input { width: 16px; height: 16px; accent-color: var(--series-wait); cursor: pointer; }
   .legend .dim { opacity: .4; }
+  .failure { background: var(--surface); border: 1px solid var(--border);
+             border-left: 3px solid var(--series-wait); border-radius: 10px;
+             padding: 12px 16px; margin: -8px 0 22px; font-size: 13px;
+             color: var(--text-secondary); line-height: 1.5; }
+  .failure b { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -220,6 +225,14 @@ function renderTask(container, task, showTime) {
   tbl.appendChild(tfoot);
   tableCard.appendChild(tbl);
   container.appendChild(tableCard);
+
+  // --- failure analysis (below the table, only if this task had failures) ---
+  if (task.analysis) {
+    const fa = el("div", "failure");
+    fa.innerHTML = "<b>Failure analysis</b> <span class='note'>" + task.n_failures +
+      " failed</span><br>" + task.analysis;
+    container.appendChild(fa);
+  }
 }
 
 const tasksEl = document.getElementById("tasks");
@@ -266,13 +279,20 @@ def _model_dict(s) -> dict:
     }
 
 
-def render_html(tasks, cfg, generated_at: str) -> str:
-    """Render the report. ``tasks`` is a list of report.TaskStats (one per task)."""
+def render_html(tasks, cfg, generated_at: str, analyses: dict | None = None) -> str:
+    """Render the report. ``tasks`` is a list of report.TaskStats (one per task).
+
+    ``analyses`` maps task_name -> {analysis, n_failures, ...} (from the DB); the
+    matching note is rendered below each task's table.
+    """
+    analyses = analyses or {}
     tasks_data = [
         {
             "task": t.task,
             "prompt": t.prompt or "",
             "models": [_model_dict(s) for s in t.models],
+            "analysis": (analyses.get(t.task) or {}).get("analysis"),
+            "n_failures": (analyses.get(t.task) or {}).get("n_failures"),
         }
         for t in tasks
     ]
