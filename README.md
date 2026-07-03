@@ -14,9 +14,19 @@ is the cost, not the tokens.**
 
 ## 📊 Results
 
-**Open [`report.html`](report.html)** for the full interactive report — one bar graph
-per task (LLM cost by default, toggle to add 🟧 time wasted), per-model tables, and
-hover details.
+The full interactive report is [`report.html`](report.html) — a self-contained page
+committed in the repo (one bar graph per task, LLM cost by default with a toggle to add
+🟧 time wasted, per-model tables, and hover details).
+
+> GitHub shows `.html` files as raw source, and external preview services
+> (githack, htmlpreview) can't read this **private** repo. To view it **rendered**,
+> open it locally after cloning:
+>
+> ```bash
+> open report.html          # macOS   (xdg-open on Linux)
+> ```
+>
+> Or regenerate it fresh from the data with `make report-html`.
 
 Latest run — 4 Anthropic models, 5 runs each, 4 tasks = **80 agentic trials** via the
 Terminus agent, all in the same git-repo environment, salary $120k/yr = $0.016026/sec.
