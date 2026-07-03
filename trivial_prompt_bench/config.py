@@ -1,4 +1,4 @@
-"""Load and expose hi-bench configuration from config.toml."""
+"""Load and expose trivial-prompt-bench configuration from config.toml."""
 
 from __future__ import annotations
 

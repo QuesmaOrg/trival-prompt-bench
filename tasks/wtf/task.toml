@@ -2,7 +2,7 @@ schema_version = "1.3"
 artifacts = []
 
 [task]
-name = "hi-bench/wtf"
+name = "trivial-prompt-bench/wtf"
 description = "Answer the user's prompt. The prompt is 'WTF'. Used to benchmark the cost and latency of a trivial single-turn request across models."
 authors = [{ name = "rafal", email = "rafal@quesma.com" }]
 keywords = ["benchmark", "cost", "latency", "smoke"]

@@ -17,9 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from hi_bench import db
-from hi_bench.config import load_config
-from hi_bench.report_html import render_html
+from trivial_prompt_bench import db
+from trivial_prompt_bench.config import load_config
+from trivial_prompt_bench.report_html import render_html
 
 
 @dataclass
@@ -161,7 +161,7 @@ def _fmt_num(x: float | None) -> str:
 
 def render(tasks: list[TaskStats], cfg) -> str:
     lines: list[str] = []
-    lines.append("hi-bench report")
+    lines.append("trivial-prompt-bench report")
     lines.append("=" * 96)
     lines.append(
         f"Salary assumption: ${cfg.annual_salary_usd:,.0f}/yr over "
@@ -203,7 +203,7 @@ def render(tasks: list[TaskStats], cfg) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Report hi-bench results.")
+    parser = argparse.ArgumentParser(description="Report trivial-prompt-bench results.")
     parser.add_argument("--db", type=Path, default=db.DEFAULT_DB_PATH)
     parser.add_argument("--config", type=Path, default=Path("config.toml"))
     parser.add_argument(

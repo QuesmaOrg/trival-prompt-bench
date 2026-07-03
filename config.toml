@@ -1,4 +1,4 @@
-# hi-bench configuration: the test suite (models) and cost assumptions.
+# trivial-prompt-bench configuration: the test suite (models) and cost assumptions.
 
 [bench]
 # Runs per model (Harbor's -k / --n-attempts). More runs -> better latency averages.

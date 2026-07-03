@@ -1,4 +1,4 @@
-"""Run the hi-bench benchmark: invoke Harbor across the model list, then ingest.
+"""Run the trivial-prompt-bench benchmark: invoke Harbor across the model list, then ingest.
 
 This shells out to the ``harbor`` CLI (rather than driving its Python API) because
 the CLI is Harbor's stable, documented surface. Harbor permutes over every ``-m``
@@ -14,15 +14,15 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 
-from hi_bench import db, ingest
-from hi_bench.config import load_config
+from trivial_prompt_bench import db, ingest
+from trivial_prompt_bench.config import load_config
 
 # Every task runs through the Terminus agent so we measure real agent overhead
 # (terminal setup + system prompt + agent loop), even for trivial prompts.
 DEFAULT_AGENT = "terminus-2"
 # Single-call chat agent, used only for offline --mock pipeline tests (mock models
 # short-circuit its one LLM call; a real agent loop can't use them).
-MOCK_AGENT = "hi_bench.agent:HiAgent"
+MOCK_AGENT = "trivial_prompt_bench.agent:HiAgent"
 TASKS_DIR = Path("tasks")
 
 
@@ -32,7 +32,7 @@ def discover_tasks(tasks_dir: Path = TASKS_DIR) -> list[Path]:
 
 
 def task_settings(task_path: Path) -> tuple[str, bool]:
-    """Read a task's per-task hi-bench settings from its task.toml [metadata].
+    """Read a task's per-task trivial-prompt-bench settings from its task.toml [metadata].
 
     Returns ``(agent, verify)``. ``agent`` is a Harbor agent name (e.g.
     ``terminus-2``) or an import path; defaults to ``HiAgent``. ``verify`` toggles
@@ -79,7 +79,7 @@ def build_command(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the hi-bench benchmark.")
+    parser = argparse.ArgumentParser(description="Run the trivial-prompt-bench benchmark.")
     parser.add_argument("--config", type=Path, default=Path("config.toml"))
     parser.add_argument("--mock", action="store_true", help="Use mock models (offline).")
     parser.add_argument("--attempts", type=int, default=None, help="Override runs/model.")

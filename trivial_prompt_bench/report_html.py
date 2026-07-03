@@ -1,4 +1,4 @@
-"""Self-contained HTML report for hi-bench.
+"""Self-contained HTML report for trivial-prompt-bench.
 
 Renders one horizontal **stacked bar per model**, split into two components that
 sum to the average total cost per run:
@@ -24,7 +24,7 @@ _TEMPLATE = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hi-bench report</title>
+<title>trivial-prompt-bench report</title>
 <style>
   :root {
     --page: #f9f9f7; --surface: #fcfcfb;
@@ -100,7 +100,7 @@ _TEMPLATE = r"""<!doctype html>
 </head>
 <body>
 <div class="wrap">
-  <h1>hi-bench &mdash; cost per model, per task</h1>
+  <h1>trivial-prompt-bench &mdash; cost per model, per task</h1>
   <p class="sub" id="sub"></p>
   <p class="assume" id="assume"></p>
 

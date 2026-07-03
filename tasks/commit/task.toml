@@ -2,13 +2,13 @@ schema_version = "1.3"
 artifacts = []
 
 [task]
-name = "hi-bench/commit"
+name = "trivial-prompt-bench/commit"
 description = "The repo has a git project with history and one uncommitted change. The prompt is 'commit'. The verifier checks that the changed file was committed."
 authors = [{ name = "rafal", email = "rafal@quesma.com" }]
 keywords = ["benchmark", "git", "agentic", "commit"]
 
 [metadata]
-# hi-bench per-task settings (read by hi_bench/run.py):
+# trivial-prompt-bench per-task settings (read by trivial_prompt_bench/run.py):
 # this is an agentic task, so run a real terminal agent and grade the result.
 agent = "terminus-2"
 verify = true

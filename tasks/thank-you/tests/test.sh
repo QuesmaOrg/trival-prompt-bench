@@ -4,4 +4,4 @@
 # verifier exists only so the task is valid and runnable with verification enabled.
 mkdir -p /logs/verifier
 echo 1 > /logs/verifier/reward.txt
-echo "hi-bench: nothing to verify; reward=1"
+echo "trivial-prompt-bench: nothing to verify; reward=1"

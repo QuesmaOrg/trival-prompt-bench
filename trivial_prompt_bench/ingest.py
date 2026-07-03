@@ -14,7 +14,7 @@ from pathlib import Path
 
 from harbor.models.trial.result import TimingInfo, TrialResult
 
-from hi_bench import db
+from trivial_prompt_bench import db
 
 
 def _duration_seconds(start, finish) -> float | None:

@@ -4,7 +4,7 @@ Guidance for working in this repository.
 
 ## What this is
 
-`hi-bench` is a tiny LLM cost/latency benchmark built on the **Harbor** framework
+`trivial-prompt-bench` is a tiny LLM cost/latency benchmark built on the **Harbor** framework
 (`harbor-framework`, `pip install harbor` — the eval harness from the creators of
 Terminal-Bench). It measures how much a task costs and how long it takes across a
 list of models.
@@ -36,15 +36,15 @@ the response, using an average US developer salary. See `config.toml`.
 tasks/<name>/             Harbor task. instruction.md is the prompt. task.toml [metadata]
                           may set `agent` and `verify` (see below). Trivial prompt tasks:
                           hi, thank-you, wtf. Agentic task: commit (git repo + verifier).
-hi_bench/agent.py         HiAgent — single-LLM-call agent, used ONLY for --mock runs
-hi_bench/run.py           Runs every task (via its chosen agent) across the models, ingests
-hi_bench/ingest.py        Parses jobs/<job>/<trial>/result.json -> sqlite
-hi_bench/db.py            sqlite schema + connection helpers
-hi_bench/report.py        Reads sqlite, prints/writes the cost/latency report
-hi_bench/report_html.py   Self-contained HTML report (one stacked bar graph per task)
+trivial_prompt_bench/agent.py         HiAgent — single-LLM-call agent, used ONLY for --mock runs
+trivial_prompt_bench/run.py           Runs every task (via its chosen agent) across the models, ingests
+trivial_prompt_bench/ingest.py        Parses jobs/<job>/<trial>/result.json -> sqlite
+trivial_prompt_bench/db.py            sqlite schema + connection helpers
+trivial_prompt_bench/report.py        Reads sqlite, prints/writes the cost/latency report
+trivial_prompt_bench/report_html.py   Self-contained HTML report (one stacked bar graph per task)
 config.toml               Model list (the "test suite") + salary assumptions
 jobs/                     Harbor's raw job output (git-ignored)
-data/hi_bench.db          sqlite database (git-ignored)
+data/trivial_prompt_bench.db          sqlite database (git-ignored)
 report.html / report.txt  Generated report artifacts (git-ignored)
 ```
 
@@ -81,7 +81,7 @@ wasted") stacks the orange waiting-cost segment on top so each bar becomes total
 The toggle rescales the axis and re-renders all task charts (`renderAll(showTime)`).
 
 Each task's graph is scaled to its own max, has its own insight line and data table,
-and the footer aggregates spend across all tasks. So when hi-bench grows beyond the
+and the footer aggregates spend across all tasks. So when trivial-prompt-bench grows beyond the
 single `Hi` task (add more dirs under `tasks/`, run them, ingest), the report
 automatically gains a graph per task with no code changes — the per-task loop is
 driven by the `task_name` column in sqlite. The task's prompt shown in each section
@@ -106,7 +106,7 @@ table if you touch `report_html.py` (they are the accessibility "relief" channel
 - `terminus-2` runs the agent loop against the container; token/cost/latency land in
   the trial result the same way regardless of which agent ran.
 - `HiAgent` (mock only) subclasses `harbor.agents.base.BaseAgent`; custom agents load by
-  **import path** (`-a hi_bench.agent:HiAgent`). The repo must be importable (installed
+  **import path** (`-a trivial_prompt_bench.agent:HiAgent`). The repo must be importable (installed
   with `uv pip install -e .`, which the Makefile does). Its `run()` executes in the
   **Harbor host process** and populates `AgentContext`
   (`n_input_tokens`, `n_cache_tokens`, `n_output_tokens`, `cost_usd`).

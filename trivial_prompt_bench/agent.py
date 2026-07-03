@@ -7,7 +7,7 @@ touch the environment container — we want to measure the cost and latency of t
 
 Harbor wraps ``run()`` in an ``agent_execution`` timing span and persists the
 populated :class:`AgentContext` (tokens + cost) into the trial's ``result.json``,
-which ``hi_bench.ingest`` later reads.
+which ``trivial_prompt_bench.ingest`` later reads.
 
 Mock models
 -----------

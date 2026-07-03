@@ -1,4 +1,4 @@
-"""sqlite storage for hi-bench runs.
+"""sqlite storage for trivial-prompt-bench runs.
 
 One row per Harbor trial (i.e. per model attempt). All numbers stored here are raw
 measurements — no salary/cost assumptions are baked in, so the report can be
@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path("data/hi_bench.db")
+DEFAULT_DB_PATH = Path("data/trivial_prompt_bench.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (

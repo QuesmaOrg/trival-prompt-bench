@@ -1,4 +1,4 @@
-# hi-bench — what a trivial LLM request really costs
+# trivial-prompt-bench — what a trivial LLM request really costs
 
 A tiny cost/latency benchmark on the [Harbor](https://github.com/harbor-framework/harbor)
 framework. It sends a trivial prompt to a set of models and prices each run as:
@@ -70,12 +70,12 @@ with `mock/*` models.
 
 ```
 tasks/<name>/          Harbor task — instruction.md is the prompt, verifier disabled
-hi_bench/agent.py      HiAgent: a custom Harbor agent making ONE LiteLLM call
-hi_bench/run.py        Runs every task under tasks/ across the model list, then ingests
-hi_bench/ingest.py     Parses jobs/<job>/<trial>/result.json → sqlite
-hi_bench/report.py     Text report + writes report.html / report.txt
-hi_bench/report_html.py Self-contained HTML: one stacked-bar graph per task
-data/hi_bench.db       sqlite results (git-ignored)
+trivial_prompt_bench/agent.py      HiAgent: a custom Harbor agent making ONE LiteLLM call
+trivial_prompt_bench/run.py        Runs every task under tasks/ across the model list, then ingests
+trivial_prompt_bench/ingest.py     Parses jobs/<job>/<trial>/result.json → sqlite
+trivial_prompt_bench/report.py     Text report + writes report.html / report.txt
+trivial_prompt_bench/report_html.py Self-contained HTML: one stacked-bar graph per task
+data/trivial_prompt_bench.db       sqlite results (git-ignored)
 report.html            Committed report artifact
 ```
 
