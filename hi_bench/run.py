@@ -10,13 +10,19 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import tomllib
 from datetime import datetime
 from pathlib import Path
 
 from hi_bench import db, ingest
 from hi_bench.config import load_config
 
-AGENT_IMPORT_PATH = "hi_bench.agent:HiAgent"
+# Every task runs through the Terminus agent so we measure real agent overhead
+# (terminal setup + system prompt + agent loop), even for trivial prompts.
+DEFAULT_AGENT = "terminus-2"
+# Single-call chat agent, used only for offline --mock pipeline tests (mock models
+# short-circuit its one LLM call; a real agent loop can't use them).
+MOCK_AGENT = "hi_bench.agent:HiAgent"
 TASKS_DIR = Path("tasks")
 
 
@@ -25,8 +31,27 @@ def discover_tasks(tasks_dir: Path = TASKS_DIR) -> list[Path]:
     return sorted(p.parent for p in tasks_dir.glob("*/task.toml"))
 
 
+def task_settings(task_path: Path) -> tuple[str, bool]:
+    """Read a task's per-task hi-bench settings from its task.toml [metadata].
+
+    Returns ``(agent, verify)``. ``agent`` is a Harbor agent name (e.g.
+    ``terminus-2``) or an import path; defaults to ``HiAgent``. ``verify`` toggles
+    whether the task's verifier runs (default off — trivial tasks have nothing to
+    grade). Agentic tasks like ``commit`` set both.
+    """
+    meta = {}
+    toml_path = task_path / "task.toml"
+    if toml_path.exists():
+        meta = tomllib.loads(toml_path.read_text()).get("metadata", {}) or {}
+    agent = meta.get("agent") or DEFAULT_AGENT
+    verify = bool(meta.get("verify", False))
+    return agent, verify
+
+
 def build_command(
     task_path: Path,
+    agent: str,
+    verify: bool,
     models: list[str],
     attempts: int,
     concurrency: int,
@@ -37,14 +62,15 @@ def build_command(
     cmd = [
         "harbor", "run",
         "-p", str(task_path),
-        "-a", AGENT_IMPORT_PATH,
+        "-a", agent,
         "-k", str(attempts),
         "-n", str(concurrency),
-        "--disable-verification",   # nothing to grade; we only measure
         "-o", str(jobs_dir),
         "--job-name", job_name,
         "-y",
     ]
+    if not verify:
+        cmd.append("--disable-verification")   # nothing to grade; we only measure
     for model in models:
         cmd += ["-m", model]
     if env_file is not None and env_file.exists():
@@ -92,9 +118,16 @@ def main() -> None:
     # report groups by task_name, so separate jobs still produce one graph per task.
     total = 0
     for task_path in tasks:
+        if args.mock:
+            # Offline pipeline test: force the single-call chat agent + mock models.
+            agent, verify = MOCK_AGENT, False
+        else:
+            agent, verify = task_settings(task_path)
         job_name = f"{base}__{task_path.name}"
         cmd = build_command(
             task_path=task_path,
+            agent=agent,
+            verify=verify,
             models=models,
             attempts=attempts,
             concurrency=concurrency,
@@ -102,7 +135,7 @@ def main() -> None:
             jobs_dir=args.jobs_dir,
             env_file=None if args.mock else args.env_file,
         )
-        print(f"\n=== task {task_path.name} -> job {job_name} ===")
+        print(f"\n=== task {task_path.name} -> job {job_name}  (agent={agent}, verify={verify}) ===")
         print("+ " + " ".join(cmd))
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
@@ -110,7 +143,9 @@ def main() -> None:
 
         job_dir = args.jobs_dir / job_name
         if job_dir.exists():
-            total += ingest.ingest_job(job_dir, args.db)
+            instruction_file = task_path / "instruction.md"
+            prompt = instruction_file.read_text().strip() if instruction_file.exists() else None
+            total += ingest.ingest_job(job_dir, args.db, prompt_override=prompt)
         else:
             print(f"Job directory {job_dir} not found; nothing to ingest for this task.")
 

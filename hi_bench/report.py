@@ -34,6 +34,8 @@ class ModelStats:
     avg_waiting_cost: float | None
     avg_total_cost: float | None
     sum_total_cost: float
+    avg_reward: float | None  # verifier pass rate (None if the task isn't graded)
+    avg_tool_calls: float | None  # avg tool calls per run (None for non-agent runs)
 
 
 @dataclass
@@ -41,6 +43,13 @@ class TaskStats:
     task: str
     prompt: str | None
     models: list[ModelStats]
+
+
+def _f(x) -> float | None:
+    """Coerce a possibly-string / possibly-None numeric cell to float or None."""
+    if x is None or x == "":
+        return None
+    return float(x)
 
 
 def _mean(xs: list[float]) -> float | None:
@@ -67,17 +76,25 @@ def _aggregate_models(rows: list, salary_per_second: float) -> list[ModelStats]:
     stats: list[ModelStats] = []
     for model, rs in by_model.items():
         ok = [r for r in rs if not r["error"]]
-        latencies = [r["agent_seconds"] for r in ok]
-        model_costs = [r["model_cost_usd"] for r in ok]
-        tokens_out = [r["n_output_tokens"] for r in ok]
+        # Latency = the transcript's summed LLM-call time when available (Terminus),
+        # falling back to the agent_execution span (e.g. HiAgent/mock runs). Coerce to
+        # float: columns added by an ALTER-TABLE migration have TEXT affinity, so SQLite
+        # may return these numbers as strings.
+        def _latency(r):
+            v = r["llm_seconds"] if r["llm_seconds"] is not None else r["agent_seconds"]
+            return _f(v)
+
+        latencies = [_latency(r) for r in ok]
+        model_costs = [_f(r["model_cost_usd"]) for r in ok]
+        tokens_out = [_f(r["n_output_tokens"]) for r in ok]
+        rewards = [_f(r["reward"]) for r in ok if r["reward"] is not None]
+        tool_calls = [_f(r["n_tool_calls"]) for r in ok if r["n_tool_calls"] is not None]
 
         waiting_costs = [
-            (r["agent_seconds"] * salary_per_second)
-            for r in ok
-            if r["agent_seconds"] is not None
+            (_latency(r) * salary_per_second) for r in ok if _latency(r) is not None
         ]
         total_costs = [
-            (r["model_cost_usd"] or 0.0) + (r["agent_seconds"] or 0.0) * salary_per_second
+            (r["model_cost_usd"] or 0.0) + (_latency(r) or 0.0) * salary_per_second
             for r in ok
         ]
 
@@ -93,6 +110,8 @@ def _aggregate_models(rows: list, salary_per_second: float) -> list[ModelStats]:
                 avg_waiting_cost=_mean(waiting_costs),
                 avg_total_cost=_mean(total_costs),
                 sum_total_cost=sum(total_costs),
+                avg_reward=_mean(rewards) if rewards else None,
+                avg_tool_calls=_mean(tool_calls) if tool_calls else None,
             )
         )
     stats.sort(key=lambda s: (s.avg_total_cost is None, s.avg_total_cost or 0.0))
@@ -102,8 +121,8 @@ def _aggregate_models(rows: list, salary_per_second: float) -> list[ModelStats]:
 def compute_stats_by_task(conn, salary_per_second: float) -> list[TaskStats]:
     """Group runs by task, then by model within each task."""
     rows = conn.execute(
-        "SELECT task_name, prompt, model, model_cost_usd, agent_seconds, "
-        "n_output_tokens, error FROM runs"
+        "SELECT task_name, prompt, model, model_cost_usd, llm_seconds, agent_seconds, "
+        "n_output_tokens, n_tool_calls, error, reward FROM runs"
     ).fetchall()
 
     by_task: dict[str, list] = {}
@@ -132,6 +151,14 @@ def _fmt_s(x: float | None) -> str:
     return "-" if x is None else f"{x:,.2f}s"
 
 
+def _fmt_pass(x: float | None) -> str:
+    return "-" if x is None else f"{x * 100:.0f}%"
+
+
+def _fmt_num(x: float | None) -> str:
+    return "-" if x is None else f"{x:.1f}"
+
+
 def render(tasks: list[TaskStats], cfg) -> str:
     lines: list[str] = []
     lines.append("hi-bench report")
@@ -142,7 +169,7 @@ def render(tasks: list[TaskStats], cfg) -> str:
         f"= ${cfg.salary_usd_per_second:.6f}/second of waiting."
     )
     header = (
-        f"{'model':<40} {'runs':>5} {'err':>4} {'avg lat':>9} {'p95 lat':>9} "
+        f"{'model':<40} {'runs':>5} {'err':>4} {'pass':>5} {'tools':>6} {'avg lat':>9} {'p95 lat':>9} "
         f"{'avg model$':>12} {'avg wait$':>12} {'avg total$':>13}"
     )
 
@@ -154,7 +181,8 @@ def render(tasks: list[TaskStats], cfg) -> str:
         lines.append("-" * len(header))
         for s in t.models:
             lines.append(
-                f"{s.model:<40} {s.n_runs:>5} {s.n_errors:>4} "
+                f"{s.model:<40} {s.n_runs:>5} {s.n_errors:>4} {_fmt_pass(s.avg_reward):>5} "
+                f"{_fmt_num(s.avg_tool_calls):>6} "
                 f"{_fmt_s(s.avg_latency):>9} {_fmt_s(s.p95_latency):>9} "
                 f"{_fmt_usd(s.avg_model_cost):>12} {_fmt_usd(s.avg_waiting_cost):>12} "
                 f"{_fmt_usd(s.avg_total_cost):>13}"

@@ -91,17 +91,25 @@ _TEMPLATE = r"""<!doctype html>
   .foot { color: var(--muted); font-size: 12px; margin-top: 24px; }
   .task-title { font-size: 16px; margin: 30px 0 10px; }
   .task-title .prompt { color: var(--text-secondary); font-weight: 400; font-size: 14px; }
+  .controls { display: flex; align-items: center; gap: 24px; margin: 0 0 18px; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;
+            color: var(--text-primary); user-select: none; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--series-wait); cursor: pointer; }
+  .legend .dim { opacity: .4; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>hi-bench &mdash; cost per model, per task</h1>
-  <p class="sub">Average total cost per run &middot; one graph per task</p>
+  <p class="sub" id="sub"></p>
   <p class="assume" id="assume"></p>
 
-  <div class="legend">
-    <span><i class="swatch sw-wait"></i> <b>Time wasted</b> <span class="note">latency &times; salary</span></span>
-    <span><i class="swatch sw-llm"></i> <b>Token wasted</b> <span class="note">LLM API cost</span></span>
+  <div class="controls">
+    <label class="toggle"><input type="checkbox" id="toggle-time"> Show <b>time wasted</b> (waiting cost)</label>
+    <div class="legend">
+      <span><i class="swatch sw-llm"></i> <b>Token wasted</b> <span class="note">LLM API cost</span></span>
+      <span id="lg-wait"><i class="swatch sw-wait"></i> <b>Time wasted</b> <span class="note">latency &times; salary</span></span>
+    </div>
   </div>
 
   <div id="tasks"></div>
@@ -113,6 +121,7 @@ const DATA = __DATA__;
 const usd = x => x == null ? "–" : "$" + x.toLocaleString(undefined, {minimumFractionDigits: 6, maximumFractionDigits: 6});
 const secs = x => x == null ? "–" : x.toFixed(2) + "s";
 const num = x => x == null ? "–" : x.toLocaleString(undefined, {maximumFractionDigits: 1});
+const pct = x => x == null ? "–" : Math.round(x * 100) + "%";
 
 document.getElementById("assume").textContent =
   "Salary assumption: $" + DATA.meta.annual_salary_usd.toLocaleString() + "/yr over " +
@@ -126,9 +135,13 @@ function showTip(e, html) { tip.innerHTML = html; tip.style.opacity = 1;
 function hideTip() { tip.style.opacity = 0; }
 function el(tag, cls) { const d = document.createElement(tag); if (cls) d.className = cls; return d; }
 
-function renderTask(container, task) {
+// showTime=false (default): bars show LLM cost only. showTime=true: stack the
+// "time wasted" (waiting cost) segment on top so the bar equals total cost per run.
+function renderTask(container, task, showTime) {
   const rows = task.models;
-  const maxTotal = Math.max(...rows.map(r => r.total || 0), 1e-9);
+  // The bar metric is LLM-only by default, or the full total when time is shown.
+  const metric = r => showTime ? (r.total || 0) : (r.llm || 0);
+  const maxVal = Math.max(...rows.map(metric), 1e-9);
 
   const title = el("h2", "task-title");
   title.innerHTML = task.task + " <span class='prompt'>&middot; prompt &ldquo;" + task.prompt + "&rdquo;</span>";
@@ -142,27 +155,42 @@ function renderTask(container, task) {
     const row = el("div", "row");
     const name = el("div", "name"); name.textContent = r.model; name.title = r.model;
     const track = el("div", "track");
-    const bar = el("div", "bar"); bar.style.width = (100 * total / maxTotal) + "%";
-    const share = v => total > 0 ? (100 * v / total).toFixed(1) + "%" : "–";
-    const wSeg = el("div", "seg seg-wait"); wSeg.style.flexBasis = (100 * wait / total) + "%";
-    wSeg.onmousemove = e => showTip(e, "<b>Time wasted</b><br>" + usd(wait) + " &middot; " + share(wait) + " of run<br>latency " + secs(r.avg_latency));
-    wSeg.onmouseleave = hideTip;
-    const lSeg = el("div", "seg seg-llm"); lSeg.style.flexBasis = (100 * llm / total) + "%";
-    lSeg.onmousemove = e => showTip(e, "<b>Token wasted</b><br>" + usd(llm) + " &middot; " + share(llm) + " of run");
+    const bar = el("div", "bar"); bar.style.width = (100 * metric(r) / maxVal) + "%";
+
+    const lSeg = el("div", "seg seg-llm");
+    lSeg.onmousemove = e => showTip(e, "<b>Token wasted</b><br>" + usd(llm) +
+      (showTime && total > 0 ? " &middot; " + (100 * llm / total).toFixed(1) + "% of total" : ""));
     lSeg.onmouseleave = hideTip;
-    bar.appendChild(wSeg); bar.appendChild(lSeg); track.appendChild(bar);
-    const tot = el("div", "total"); tot.textContent = usd(total);
+
+    if (showTime) {
+      // stacked: [time wasted | llm] == total
+      const wSeg = el("div", "seg seg-wait");
+      wSeg.style.flexBasis = (100 * wait / total) + "%";
+      wSeg.onmousemove = e => showTip(e, "<b>Time wasted</b><br>" + usd(wait) + " &middot; " +
+        (total > 0 ? (100 * wait / total).toFixed(1) + "% of total" : "–") + "<br>latency " + secs(r.avg_latency));
+      wSeg.onmouseleave = hideTip;
+      lSeg.style.flexBasis = (100 * llm / total) + "%";
+      bar.appendChild(wSeg); bar.appendChild(lSeg);
+    } else {
+      // LLM cost only: single segment, both ends rounded, no gap
+      lSeg.style.flexBasis = "100%";
+      lSeg.style.borderRadius = "4px";
+      lSeg.style.marginLeft = "0";
+      bar.appendChild(lSeg);
+    }
+    track.appendChild(bar);
+    const tot = el("div", "total"); tot.textContent = usd(metric(r));
     row.appendChild(name); row.appendChild(track); row.appendChild(tot);
     chart.appendChild(row);
   }
   const axis = el("div", "axis");
   const ticks = el("div", "ticks");
-  ticks.innerHTML = "<span>$0</span><span>" + usd(maxTotal / 2) + "</span><span>" + usd(maxTotal) + "</span>";
+  ticks.innerHTML = "<span>$0</span><span>" + usd(maxVal / 2) + "</span><span>" + usd(maxVal) + "</span>";
   chart.appendChild(axis); chart.appendChild(ticks);
   chartCard.appendChild(chart);
 
   const cheapest = rows[0];
-  if (cheapest && cheapest.llm && cheapest.waiting) {
+  if (showTime && cheapest && cheapest.llm && cheapest.waiting) {
     const mult = Math.round(cheapest.waiting / cheapest.llm);
     const insight = el("p", "insight");
     insight.textContent = "Waiting cost dwarfs API cost — about " + mult +
@@ -171,16 +199,16 @@ function renderTask(container, task) {
   }
   container.appendChild(chartCard);
 
-  // --- table card ---
+  // --- table card (unchanged by the toggle; always shows every column) ---
   const tableCard = el("div", "card");
   const tbl = el("table");
-  tbl.innerHTML = "<thead><tr><th>model</th><th>runs</th><th>err</th><th>avg latency</th>" +
+  tbl.innerHTML = "<thead><tr><th>model</th><th>runs</th><th>err</th><th>pass</th><th>tool calls</th><th>avg latency</th>" +
     "<th>p95</th><th>avg tokens out</th><th>LLM $/run</th><th>waiting $/run</th><th>total $/run</th></tr></thead>";
   const tbody = el("tbody");
   for (const r of rows) {
     const tr = el("tr");
     tr.innerHTML = "<td>" + r.model + "</td><td>" + r.n_runs + "</td><td>" + r.n_errors +
-      "</td><td>" + secs(r.avg_latency) + "</td><td>" + secs(r.p95_latency) +
+      "</td><td>" + pct(r.reward) + "</td><td>" + num(r.tool_calls) + "</td><td>" + secs(r.avg_latency) + "</td><td>" + secs(r.p95_latency) +
       "</td><td>" + num(r.avg_tokens_out) + "</td><td>" + usd(r.llm) +
       "</td><td>" + usd(r.waiting) + "</td><td>" + usd(r.total) + "</td>";
     tbody.appendChild(tr);
@@ -188,14 +216,28 @@ function renderTask(container, task) {
   tbl.appendChild(tbody);
   const taskSpend = rows.reduce((a, r) => a + (r.sum_total || 0), 0);
   const tfoot = el("tfoot");
-  tfoot.innerHTML = "<tr><td>task spend (all runs)</td><td colspan='7'></td><td>" + usd(taskSpend) + "</td></tr>";
+  tfoot.innerHTML = "<tr><td>task spend (all runs)</td><td colspan='9'></td><td>" + usd(taskSpend) + "</td></tr>";
   tbl.appendChild(tfoot);
   tableCard.appendChild(tbl);
   container.appendChild(tableCard);
 }
 
 const tasksEl = document.getElementById("tasks");
-for (const task of DATA.tasks) renderTask(tasksEl, task);
+const subEl = document.getElementById("sub");
+const waitLegend = document.getElementById("lg-wait");
+
+function renderAll(showTime) {
+  subEl.textContent = showTime
+    ? "Average total cost per run (LLM cost + time wasted) · one graph per task"
+    : "Average LLM API cost per run · one graph per task · toggle to add waiting-time cost";
+  waitLegend.classList.toggle("dim", !showTime);
+  tasksEl.innerHTML = "";
+  for (const task of DATA.tasks) renderTask(tasksEl, task, showTime);
+}
+
+const toggle = document.getElementById("toggle-time");
+toggle.addEventListener("change", () => renderAll(toggle.checked));
+renderAll(false);  // default: LLM cost only
 
 const grand = DATA.tasks.reduce((a, t) => a + t.models.reduce((b, r) => b + (r.sum_total || 0), 0), 0);
 document.getElementById("foot").textContent = "Generated " + DATA.meta.generated_at + " from " +
@@ -219,6 +261,8 @@ def _model_dict(s) -> dict:
         "waiting": s.avg_waiting_cost,
         "total": s.avg_total_cost,
         "sum_total": s.sum_total_cost,
+        "reward": s.avg_reward,
+        "tool_calls": s.avg_tool_calls,
     }
 
 

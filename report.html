@@ -70,17 +70,25 @@
   .foot { color: var(--muted); font-size: 12px; margin-top: 24px; }
   .task-title { font-size: 16px; margin: 30px 0 10px; }
   .task-title .prompt { color: var(--text-secondary); font-weight: 400; font-size: 14px; }
+  .controls { display: flex; align-items: center; gap: 24px; margin: 0 0 18px; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;
+            color: var(--text-primary); user-select: none; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--series-wait); cursor: pointer; }
+  .legend .dim { opacity: .4; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>hi-bench &mdash; cost per model, per task</h1>
-  <p class="sub">Average total cost per run &middot; one graph per task</p>
+  <p class="sub" id="sub"></p>
   <p class="assume" id="assume"></p>
 
-  <div class="legend">
-    <span><i class="swatch sw-wait"></i> <b>Time wasted</b> <span class="note">latency &times; salary</span></span>
-    <span><i class="swatch sw-llm"></i> <b>Token wasted</b> <span class="note">LLM API cost</span></span>
+  <div class="controls">
+    <label class="toggle"><input type="checkbox" id="toggle-time"> Show <b>time wasted</b> (waiting cost)</label>
+    <div class="legend">
+      <span><i class="swatch sw-llm"></i> <b>Token wasted</b> <span class="note">LLM API cost</span></span>
+      <span id="lg-wait"><i class="swatch sw-wait"></i> <b>Time wasted</b> <span class="note">latency &times; salary</span></span>
+    </div>
   </div>
 
   <div id="tasks"></div>
@@ -88,10 +96,11 @@
 </div>
 <div id="tip"></div>
 <script>
-const DATA = {"meta": {"annual_salary_usd": 120000.0, "work_hours_per_year": 2080.0, "salary_per_second": 0.016025641025641024, "generated_at": "2026-07-02 17:03", "total_runs": 40}, "tasks": [{"task": "hi-bench/hi", "prompt": "Hi", "models": [{"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 0, "avg_latency": 1.0140808, "p95_latency": 1.724941, "avg_tokens_out": 15.8, "llm": 8.700000000000001e-05, "waiting": 0.01625129487179487, "total": 0.01633829487179487, "sum_total": 0.08169147435897435}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 1.5141392, "p95_latency": 2.281999, "avg_tokens_out": 14.0, "llm": 0.00039500000000000006, "waiting": 0.02426505128205128, "total": 0.02466005128205128, "sum_total": 0.1233002564102564}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 2.6310258, "p95_latency": 3.103992, "avg_tokens_out": 13.2, "llm": 0.00022500000000000002, "waiting": 0.042163874999999996, "total": 0.042388875, "sum_total": 0.211944375}, {"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 0, "avg_latency": 4.8427706, "p95_latency": 5.802283, "avg_tokens_out": 30.8, "llm": 0.0016300000000000002, "waiting": 0.0776085032051282, "total": 0.0792385032051282, "sum_total": 0.396192516025641}]}, {"task": "hi-bench/thank-you", "prompt": "Thank you", "models": [{"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 0, "avg_latency": 1.0681646, "p95_latency": 1.8268, "avg_tokens_out": 21.0, "llm": 0.00011399999999999999, "waiting": 0.017118022435897433, "total": 0.017232022435897436, "sum_total": 0.08616011217948717}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 1.515193, "p95_latency": 1.619235, "avg_tokens_out": 24.4, "llm": 0.000396, "waiting": 0.024281939102564102, "total": 0.024677939102564102, "sum_total": 0.12338969551282052}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 2.9261326, "p95_latency": 7.83715, "avg_tokens_out": 23.8, "llm": 0.000645, "waiting": 0.04689315064102564, "total": 0.04753815064102564, "sum_total": 0.2376907532051282}, {"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 0, "avg_latency": 5.187954400000001, "p95_latency": 5.600699, "avg_tokens_out": 85.8, "llm": 0.00439, "waiting": 0.08314029487179486, "total": 0.08753029487179487, "sum_total": 0.43765147435897434}]}]};
+const DATA = {"meta": {"annual_salary_usd": 120000.0, "work_hours_per_year": 2080.0, "salary_per_second": 0.016025641025641024, "generated_at": "2026-07-03 12:49", "total_runs": 80}, "tasks": [{"task": "hi-bench/commit", "prompt": "commit", "models": [{"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 0, "avg_latency": 6.758442068099976, "p95_latency": 8.211677312850952, "avg_tokens_out": 563.8, "llm": 0.0066524, "waiting": 0.10830836647596113, "total": 0.11496076647596114, "sum_total": 0.5748038323798057, "reward": 1.0, "tool_calls": 4.6}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 15.32190637588501, "p95_latency": 19.927772045135498, "avg_tokens_out": 1183.2, "llm": 0.034040429999999997, "waiting": 0.2455433714084136, "total": 0.2795838014084136, "sum_total": 1.397919007042068, "reward": 1.0, "tool_calls": 9.6}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 21.634824991226196, "p95_latency": 47.54635500907898, "avg_tokens_out": 1301.6, "llm": 0.060301850000000004, "waiting": 0.34671193896195823, "total": 0.4070137889619582, "sum_total": 2.035068944809791, "reward": 1.0, "tool_calls": 8.6}, {"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 0, "avg_latency": 31.11410174369812, "p95_latency": 34.853636741638184, "avg_tokens_out": 929.2, "llm": 0.08700669999999999, "waiting": 0.49862342537977755, "total": 0.5856301253797775, "sum_total": 2.9281506268988875, "reward": 1.0, "tool_calls": 7.2}]}, {"task": "hi-bench/hi", "prompt": "Hi", "models": [{"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 0, "avg_latency": 10.682365322113037, "p95_latency": 13.133636236190796, "avg_tokens_out": 308.0, "llm": 0.0325147, "waiting": 0.1711917519569397, "total": 0.20370645195693968, "sum_total": 1.0185322597846984, "reward": null, "tool_calls": 2.8}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 23.410093069076538, "p95_latency": 29.482167720794678, "avg_tokens_out": 1278.6, "llm": 0.06173465, "waiting": 0.37516174790186757, "total": 0.4368963979018676, "sum_total": 2.184481989509338, "reward": null, "tool_calls": 10.2}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 45.47813577651978, "p95_latency": 58.01076817512512, "avg_tokens_out": 4071.0, "llm": 0.10114155, "waiting": 0.7288162784698681, "total": 0.8299578284698681, "sum_total": 4.1497891423493405, "reward": null, "tool_calls": 32.2}, {"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 4, "avg_latency": 48.40922546386719, "p95_latency": 48.40922546386719, "avg_tokens_out": 3662.0, "llm": 0.058584199999999996, "waiting": 0.7757888696132561, "total": 0.8343730696132561, "sum_total": 0.8343730696132561, "reward": null, "tool_calls": 22.0}]}, {"task": "hi-bench/thank-you", "prompt": "Thank you", "models": [{"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 2, "avg_latency": 12.404683192571005, "p95_latency": 18.039937019348145, "avg_tokens_out": 932.3333333333334, "llm": 0.013152666666666667, "waiting": 0.19879299988094556, "total": 0.21194566654761224, "sum_total": 0.6358369996428367, "reward": null, "tool_calls": 5.666666666666667}, {"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 0, "avg_latency": 12.27876615524292, "p95_latency": 13.731057167053223, "avg_tokens_out": 247.6, "llm": 0.028470700000000005, "waiting": 0.19677509864171344, "total": 0.22524579864171343, "sum_total": 1.1262289932085672, "reward": null, "tool_calls": 2.0}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 26.527174139022826, "p95_latency": 36.739867210388184, "avg_tokens_out": 1381.6, "llm": 0.06734935, "waiting": 0.42511497017664784, "total": 0.4924643201766479, "sum_total": 2.4623216008832394, "reward": null, "tool_calls": 9.6}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 33.657072353363034, "p95_latency": 49.7261426448822, "avg_tokens_out": 2686.8, "llm": 0.06954996000000001, "waiting": 0.539376159509023, "total": 0.608926119509023, "sum_total": 3.044630597545115, "reward": null, "tool_calls": 15.6}]}, {"task": "hi-bench/wtf", "prompt": "WTF", "models": [{"model": "anthropic/claude-haiku-4-5-20251001", "n_runs": 5, "n_errors": 0, "avg_latency": 21.197493934631346, "p95_latency": 29.463670253753662, "avg_tokens_out": 2056.4, "llm": 0.02620519, "waiting": 0.3397034284396049, "total": 0.36590861843960487, "sum_total": 1.8295430921980245, "reward": null, "tool_calls": 18.0}, {"model": "anthropic/claude-sonnet-5", "n_runs": 5, "n_errors": 0, "avg_latency": 54.15122299194336, "p95_latency": 59.05284333229065, "avg_tokens_out": 4596.2, "llm": 0.11653758, "waiting": 0.867808060768323, "total": 0.9843456407683229, "sum_total": 4.921728203841615, "reward": null, "tool_calls": 33.4}, {"model": "anthropic/claude-opus-4-8", "n_runs": 5, "n_errors": 0, "avg_latency": 54.99959712028503, "p95_latency": 70.738774061203, "avg_tokens_out": 3133.8, "llm": 0.14405320000000002, "waiting": 0.8814038000045678, "total": 1.0254570000045677, "sum_total": 5.127285000022839, "reward": null, "tool_calls": 23.0}, {"model": "anthropic/claude-fable-5", "n_runs": 5, "n_errors": 5, "avg_latency": null, "p95_latency": null, "avg_tokens_out": null, "llm": null, "waiting": null, "total": null, "sum_total": 0, "reward": null, "tool_calls": null}]}]};
 const usd = x => x == null ? "–" : "$" + x.toLocaleString(undefined, {minimumFractionDigits: 6, maximumFractionDigits: 6});
 const secs = x => x == null ? "–" : x.toFixed(2) + "s";
 const num = x => x == null ? "–" : x.toLocaleString(undefined, {maximumFractionDigits: 1});
+const pct = x => x == null ? "–" : Math.round(x * 100) + "%";
 
 document.getElementById("assume").textContent =
   "Salary assumption: $" + DATA.meta.annual_salary_usd.toLocaleString() + "/yr over " +
@@ -105,9 +114,13 @@ function showTip(e, html) { tip.innerHTML = html; tip.style.opacity = 1;
 function hideTip() { tip.style.opacity = 0; }
 function el(tag, cls) { const d = document.createElement(tag); if (cls) d.className = cls; return d; }
 
-function renderTask(container, task) {
+// showTime=false (default): bars show LLM cost only. showTime=true: stack the
+// "time wasted" (waiting cost) segment on top so the bar equals total cost per run.
+function renderTask(container, task, showTime) {
   const rows = task.models;
-  const maxTotal = Math.max(...rows.map(r => r.total || 0), 1e-9);
+  // The bar metric is LLM-only by default, or the full total when time is shown.
+  const metric = r => showTime ? (r.total || 0) : (r.llm || 0);
+  const maxVal = Math.max(...rows.map(metric), 1e-9);
 
   const title = el("h2", "task-title");
   title.innerHTML = task.task + " <span class='prompt'>&middot; prompt &ldquo;" + task.prompt + "&rdquo;</span>";
@@ -121,27 +134,42 @@ function renderTask(container, task) {
     const row = el("div", "row");
     const name = el("div", "name"); name.textContent = r.model; name.title = r.model;
     const track = el("div", "track");
-    const bar = el("div", "bar"); bar.style.width = (100 * total / maxTotal) + "%";
-    const share = v => total > 0 ? (100 * v / total).toFixed(1) + "%" : "–";
-    const wSeg = el("div", "seg seg-wait"); wSeg.style.flexBasis = (100 * wait / total) + "%";
-    wSeg.onmousemove = e => showTip(e, "<b>Time wasted</b><br>" + usd(wait) + " &middot; " + share(wait) + " of run<br>latency " + secs(r.avg_latency));
-    wSeg.onmouseleave = hideTip;
-    const lSeg = el("div", "seg seg-llm"); lSeg.style.flexBasis = (100 * llm / total) + "%";
-    lSeg.onmousemove = e => showTip(e, "<b>Token wasted</b><br>" + usd(llm) + " &middot; " + share(llm) + " of run");
+    const bar = el("div", "bar"); bar.style.width = (100 * metric(r) / maxVal) + "%";
+
+    const lSeg = el("div", "seg seg-llm");
+    lSeg.onmousemove = e => showTip(e, "<b>Token wasted</b><br>" + usd(llm) +
+      (showTime && total > 0 ? " &middot; " + (100 * llm / total).toFixed(1) + "% of total" : ""));
     lSeg.onmouseleave = hideTip;
-    bar.appendChild(wSeg); bar.appendChild(lSeg); track.appendChild(bar);
-    const tot = el("div", "total"); tot.textContent = usd(total);
+
+    if (showTime) {
+      // stacked: [time wasted | llm] == total
+      const wSeg = el("div", "seg seg-wait");
+      wSeg.style.flexBasis = (100 * wait / total) + "%";
+      wSeg.onmousemove = e => showTip(e, "<b>Time wasted</b><br>" + usd(wait) + " &middot; " +
+        (total > 0 ? (100 * wait / total).toFixed(1) + "% of total" : "–") + "<br>latency " + secs(r.avg_latency));
+      wSeg.onmouseleave = hideTip;
+      lSeg.style.flexBasis = (100 * llm / total) + "%";
+      bar.appendChild(wSeg); bar.appendChild(lSeg);
+    } else {
+      // LLM cost only: single segment, both ends rounded, no gap
+      lSeg.style.flexBasis = "100%";
+      lSeg.style.borderRadius = "4px";
+      lSeg.style.marginLeft = "0";
+      bar.appendChild(lSeg);
+    }
+    track.appendChild(bar);
+    const tot = el("div", "total"); tot.textContent = usd(metric(r));
     row.appendChild(name); row.appendChild(track); row.appendChild(tot);
     chart.appendChild(row);
   }
   const axis = el("div", "axis");
   const ticks = el("div", "ticks");
-  ticks.innerHTML = "<span>$0</span><span>" + usd(maxTotal / 2) + "</span><span>" + usd(maxTotal) + "</span>";
+  ticks.innerHTML = "<span>$0</span><span>" + usd(maxVal / 2) + "</span><span>" + usd(maxVal) + "</span>";
   chart.appendChild(axis); chart.appendChild(ticks);
   chartCard.appendChild(chart);
 
   const cheapest = rows[0];
-  if (cheapest && cheapest.llm && cheapest.waiting) {
+  if (showTime && cheapest && cheapest.llm && cheapest.waiting) {
     const mult = Math.round(cheapest.waiting / cheapest.llm);
     const insight = el("p", "insight");
     insight.textContent = "Waiting cost dwarfs API cost — about " + mult +
@@ -150,16 +178,16 @@ function renderTask(container, task) {
   }
   container.appendChild(chartCard);
 
-  // --- table card ---
+  // --- table card (unchanged by the toggle; always shows every column) ---
   const tableCard = el("div", "card");
   const tbl = el("table");
-  tbl.innerHTML = "<thead><tr><th>model</th><th>runs</th><th>err</th><th>avg latency</th>" +
+  tbl.innerHTML = "<thead><tr><th>model</th><th>runs</th><th>err</th><th>pass</th><th>tool calls</th><th>avg latency</th>" +
     "<th>p95</th><th>avg tokens out</th><th>LLM $/run</th><th>waiting $/run</th><th>total $/run</th></tr></thead>";
   const tbody = el("tbody");
   for (const r of rows) {
     const tr = el("tr");
     tr.innerHTML = "<td>" + r.model + "</td><td>" + r.n_runs + "</td><td>" + r.n_errors +
-      "</td><td>" + secs(r.avg_latency) + "</td><td>" + secs(r.p95_latency) +
+      "</td><td>" + pct(r.reward) + "</td><td>" + num(r.tool_calls) + "</td><td>" + secs(r.avg_latency) + "</td><td>" + secs(r.p95_latency) +
       "</td><td>" + num(r.avg_tokens_out) + "</td><td>" + usd(r.llm) +
       "</td><td>" + usd(r.waiting) + "</td><td>" + usd(r.total) + "</td>";
     tbody.appendChild(tr);
@@ -167,14 +195,28 @@ function renderTask(container, task) {
   tbl.appendChild(tbody);
   const taskSpend = rows.reduce((a, r) => a + (r.sum_total || 0), 0);
   const tfoot = el("tfoot");
-  tfoot.innerHTML = "<tr><td>task spend (all runs)</td><td colspan='7'></td><td>" + usd(taskSpend) + "</td></tr>";
+  tfoot.innerHTML = "<tr><td>task spend (all runs)</td><td colspan='9'></td><td>" + usd(taskSpend) + "</td></tr>";
   tbl.appendChild(tfoot);
   tableCard.appendChild(tbl);
   container.appendChild(tableCard);
 }
 
 const tasksEl = document.getElementById("tasks");
-for (const task of DATA.tasks) renderTask(tasksEl, task);
+const subEl = document.getElementById("sub");
+const waitLegend = document.getElementById("lg-wait");
+
+function renderAll(showTime) {
+  subEl.textContent = showTime
+    ? "Average total cost per run (LLM cost + time wasted) · one graph per task"
+    : "Average LLM API cost per run · one graph per task · toggle to add waiting-time cost";
+  waitLegend.classList.toggle("dim", !showTime);
+  tasksEl.innerHTML = "";
+  for (const task of DATA.tasks) renderTask(tasksEl, task, showTime);
+}
+
+const toggle = document.getElementById("toggle-time");
+toggle.addEventListener("change", () => renderAll(toggle.checked));
+renderAll(false);  // default: LLM cost only
 
 const grand = DATA.tasks.reduce((a, t) => a + t.models.reduce((b, r) => b + (r.sum_total || 0), 0), 0);
 document.getElementById("foot").textContent = "Generated " + DATA.meta.generated_at + " from " +

@@ -28,12 +28,16 @@ CREATE TABLE IF NOT EXISTS runs (
     n_cache_tokens  INTEGER,
     n_output_tokens INTEGER,
     model_cost_usd  REAL,               -- cost of the model call (LiteLLM pricing)
-    agent_seconds   REAL,               -- model-call latency == user waiting time
+    llm_seconds     REAL,               -- SUM of per-call LLM latency from the transcript
+    n_llm_calls     INTEGER,            -- number of model calls in the transcript
+    n_tool_calls    INTEGER,            -- tool calls the agent made (from the trajectory)
+    agent_seconds   REAL,               -- agent_execution wall span (incl. terminal waits)
     total_seconds   REAL,               -- full trial wall time (incl. env build)
     env_setup_seconds REAL,
     started_at      TEXT,
     finished_at     TEXT,
     error           TEXT,               -- exception type/message if the trial failed
+    reward          REAL,               -- verifier reward (NULL if verification disabled)
     response_text   TEXT,
     ingested_at     TEXT
 );
@@ -46,8 +50,9 @@ RUN_COLUMNS = [
     "trial_id", "job_name", "task_name", "prompt", "trial_name",
     "agent_name", "agent_version", "model", "provider", "model_name",
     "n_input_tokens", "n_cache_tokens", "n_output_tokens", "model_cost_usd",
+    "llm_seconds", "n_llm_calls", "n_tool_calls",
     "agent_seconds", "total_seconds", "env_setup_seconds",
-    "started_at", "finished_at", "error", "response_text", "ingested_at",
+    "started_at", "finished_at", "error", "reward", "response_text", "ingested_at",
 ]
 
 
@@ -62,12 +67,22 @@ def connect(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     return conn
 
 
+# Affinity for columns added by migration (default TEXT). Numeric columns must NOT be
+# TEXT, or SQLite stores inserted numbers as strings and the report can't do math.
+_COLUMN_AFFINITY = {
+    "n_input_tokens": "INTEGER", "n_cache_tokens": "INTEGER",
+    "n_output_tokens": "INTEGER", "n_llm_calls": "INTEGER", "n_tool_calls": "INTEGER",
+    "model_cost_usd": "REAL", "llm_seconds": "REAL", "agent_seconds": "REAL",
+    "total_seconds": "REAL", "env_setup_seconds": "REAL", "reward": "REAL",
+}
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add columns introduced after a DB was first created (idempotent)."""
     existing = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
     for col in RUN_COLUMNS:
         if col not in existing:
-            conn.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
+            conn.execute(f"ALTER TABLE runs ADD COLUMN {col} {_COLUMN_AFFINITY.get(col, 'TEXT')}")
     conn.commit()
 
 

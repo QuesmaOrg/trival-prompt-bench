@@ -8,6 +8,7 @@ parse), extracts tokens/cost/timings, and upserts one row per trial.
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,7 +29,24 @@ def _timing_duration(timing: TimingInfo | None) -> float | None:
     return _duration_seconds(timing.started_at, timing.finished_at)
 
 
-def trial_to_row(result: TrialResult, job_name: str) -> dict:
+def count_tool_calls(trial_dir: Path) -> int | None:
+    """Count tool calls the agent made, from the ATIF trajectory in agent/trajectory.json.
+
+    Sums ``tool_calls`` across all steps (includes real commands like ``bash_command``
+    plus the agent's ``mark_task_complete`` marker). Returns None when there's no
+    trajectory (e.g. HiAgent/mock runs, which don't produce one).
+    """
+    traj = trial_dir / "agent" / "trajectory.json"
+    if not traj.exists():
+        return None
+    try:
+        data = json.loads(traj.read_text())
+    except Exception:
+        return None
+    return sum(len(step.get("tool_calls") or []) for step in data.get("steps", []))
+
+
+def trial_to_row(result: TrialResult, job_name: str, prompt_override: str | None = None) -> dict:
     n_input, n_cache, n_output, cost = result.compute_token_cost_totals()
 
     model_info = result.agent_info.model_info
@@ -50,6 +68,28 @@ def trial_to_row(result: TrialResult, job_name: str) -> dict:
     if result.agent_result is not None and result.agent_result.metadata:
         response_text = result.agent_result.metadata.get("response_text")
         prompt = result.agent_result.metadata.get("prompt")
+    # The task's instruction is authoritative and agent-independent (HiAgent records
+    # the prompt in metadata, but Terminus does not) — prefer it when known.
+    if prompt_override is not None:
+        prompt = prompt_override
+
+    reward = None
+    if result.verifier_result is not None and result.verifier_result.rewards:
+        rewards = result.verifier_result.rewards
+        # Tasks emit a single 'reward'; fall back to the first value otherwise.
+        reward = rewards.get("reward", next(iter(rewards.values()), None))
+
+    # Transcript latency: Terminus records each LLM call's wall time (ms) in
+    # metadata["api_request_times_msec"]. Their sum is the real time spent waiting on
+    # the model, excluding tmux polling and the model-chosen command waits that inflate
+    # the agent_execution span. This is what we bill the developer's waiting time against.
+    llm_seconds = None
+    n_llm_calls = None
+    if result.agent_result is not None and result.agent_result.metadata:
+        api_times = result.agent_result.metadata.get("api_request_times_msec")
+        if api_times:
+            llm_seconds = sum(api_times) / 1000.0
+            n_llm_calls = len(api_times)
 
     return {
         "trial_id": str(result.id),
@@ -66,19 +106,26 @@ def trial_to_row(result: TrialResult, job_name: str) -> dict:
         "n_cache_tokens": n_cache,
         "n_output_tokens": n_output,
         "model_cost_usd": cost,
+        "llm_seconds": llm_seconds,
+        "n_llm_calls": n_llm_calls,
         "agent_seconds": _timing_duration(result.agent_execution),
         "total_seconds": _duration_seconds(result.started_at, result.finished_at),
         "env_setup_seconds": _timing_duration(result.environment_setup),
         "started_at": result.started_at.isoformat() if result.started_at else None,
         "finished_at": result.finished_at.isoformat() if result.finished_at else None,
         "error": error,
+        "reward": reward,
         "response_text": response_text,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def ingest_job(job_dir: Path, db_path: Path) -> int:
-    """Ingest every result.json under *job_dir*. Returns the number of rows written."""
+def ingest_job(job_dir: Path, db_path: Path, prompt_override: str | None = None) -> int:
+    """Ingest every result.json under *job_dir*. Returns the number of rows written.
+
+    ``prompt_override`` fills the ``prompt`` column from the task's instruction (the
+    authoritative, agent-independent source) instead of relying on agent metadata.
+    """
     job_dir = Path(job_dir)
     job_name = job_dir.name
     result_files = sorted(job_dir.rglob("result.json"))
@@ -96,7 +143,9 @@ def ingest_job(job_dir: Path, db_path: Path) -> int:
             except Exception as exc:
                 print(f"  skip {path}: {exc}")
                 continue
-            db.upsert_run(conn, trial_to_row(result, job_name))
+            row = trial_to_row(result, job_name, prompt_override)
+            row["n_tool_calls"] = count_tool_calls(path.parent)
+            db.upsert_run(conn, row)
             written += 1
         conn.commit()
     finally:
