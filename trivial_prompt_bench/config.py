@@ -13,6 +13,7 @@ DEFAULT_CONFIG_PATH = Path("config.toml")
 class Config:
     attempts: int
     concurrency: int
+    run_tasks: list[str]
     models: list[str]
     mock_models: list[str]
     analysis_model: str
@@ -33,6 +34,7 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> Config:
     return Config(
         attempts=int(bench.get("attempts", 5)),
         concurrency=int(bench.get("concurrency", 4)),
+        run_tasks=list(bench.get("tasks", ["hi", "thank-you", "wtf", "commit"])),
         models=list(models.get("list", [])),
         mock_models=list(models.get("mock_list", [])),
         analysis_model=str(analysis.get("model", "anthropic/claude-haiku-4-5-20251001")),

@@ -191,9 +191,22 @@ def render(tasks: list[TaskStats], cfg, analyses: dict | None = None) -> str:
         task_total = sum(s.sum_total_cost for s in t.models)
         grand += task_total
         lines.append(f"{'  task total spend (all runs)':<71}{_fmt_usd(task_total):>44}")
-        fa = analyses.get(t.task)
-        if fa:
-            lines.append(f"  Failure analysis ({fa['n_failures']} failed): {fa['analysis']}")
+
+        rows = analyses.get(t.task, {})
+        if rows:
+            lines.append("  Tool usage (by model):")
+            for s in t.models:
+                a = rows.get(s.model)
+                if a and a["tool_usage"]:
+                    lines.append(f"    - {s.model.split('/')[-1]}: {a['tool_usage']}")
+            fails = [(s, rows.get(s.model)) for s in t.models
+                     if rows.get(s.model) and rows[s.model]["failure_summary"]]
+            if fails:
+                lines.append("  Failure modes (by model):")
+                for s, a in fails:
+                    lines.append(f"    - {s.model.split('/')[-1]} ({a['n_failures']} failed): {a['failure_summary']}")
+                    if a["failure_details"]:
+                        lines.append(f"        {a['failure_details']}")
 
     lines.append("")
     lines.append("=" * 96)
@@ -228,12 +241,12 @@ def main() -> None:
             print("No runs in the database yet. Run `make smoke` or `make bench` first.")
             return
         tasks = compute_stats_by_task(conn, cfg.salary_usd_per_second)
-        analyses = {
-            r["task_name"]: dict(r)
-            for r in conn.execute(
-                "SELECT task_name, n_failures, analysis, model, generated_at FROM failure_analysis"
-            )
-        }
+        analyses: dict = {}
+        for r in conn.execute(
+            "SELECT task_name, model, n_runs, n_failures, tool_usage, "
+            "failure_summary, failure_details FROM analysis"
+        ):
+            analyses.setdefault(r["task_name"], {})[r["model"]] = dict(r)
     finally:
         conn.close()
 

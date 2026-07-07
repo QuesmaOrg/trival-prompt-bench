@@ -83,8 +83,13 @@ class HiAgent(BaseAgent):
             context.n_output_tokens = getattr(usage, "completion_tokens", None)
             context.n_cache_tokens = _extract_cache_tokens(usage)
 
+        # Prefer the cost the provider returned (OpenRouter fills this even for models
+        # LiteLLM's static price map doesn't know); fall back to computing it.
+        hidden = getattr(response, "_hidden_params", None) or {}
+        context.cost_usd = hidden.get("response_cost") or None
         try:
-            context.cost_usd = litellm.completion_cost(completion_response=response)
+            if context.cost_usd is None:
+                context.cost_usd = litellm.completion_cost(completion_response=response)
         except Exception as exc:  # pricing table may lack an entry for the model
             self.logger.warning("Could not compute cost for %s: %s", self.model_name, exc)
             context.cost_usd = None

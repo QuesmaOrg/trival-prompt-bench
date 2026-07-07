@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS runs (
     llm_seconds     REAL,               -- SUM of per-call LLM latency from the transcript
     n_llm_calls     INTEGER,            -- number of model calls in the transcript
     n_tool_calls    INTEGER,            -- tool calls the agent made (from the trajectory)
+    tool_calls_json TEXT,               -- JSON list of the agent's tool calls (fn + command)
     agent_seconds   REAL,               -- agent_execution wall span (incl. terminal waits)
     total_seconds   REAL,               -- full trial wall time (incl. env build)
     env_setup_seconds REAL,
@@ -45,14 +46,20 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model);
 CREATE INDEX IF NOT EXISTS idx_runs_job ON runs(job_name);
 
--- One short, LLM-generated root-cause note per task that had failed runs.
+-- One LLM-generated analysis per (task, model): what the agent did with its tools,
+-- and (when there were failures) the failure mode as summary + details.
 -- Written by trivial_prompt_bench.analyze; the report only reads it.
-CREATE TABLE IF NOT EXISTS failure_analysis (
-    task_name    TEXT PRIMARY KEY,
-    n_failures   INTEGER,
-    analysis     TEXT,
-    model        TEXT,          -- the model used to generate the analysis
-    generated_at TEXT
+CREATE TABLE IF NOT EXISTS analysis (
+    task_name       TEXT,
+    model           TEXT,       -- full model id, matching runs.model
+    n_runs          INTEGER,
+    n_failures      INTEGER,
+    tool_usage      TEXT,       -- what the agent actually did (folded, grouped by model)
+    failure_summary TEXT,       -- one-line failure mode; NULL if no failures
+    failure_details TEXT,       -- detailed failure mode (folded); NULL if no failures
+    gen_model       TEXT,       -- model used to generate this analysis
+    generated_at    TEXT,
+    PRIMARY KEY (task_name, model)
 );
 """
 
@@ -60,7 +67,7 @@ RUN_COLUMNS = [
     "trial_id", "job_name", "task_name", "prompt", "trial_name",
     "agent_name", "agent_version", "model", "provider", "model_name",
     "n_input_tokens", "n_cache_tokens", "n_output_tokens", "model_cost_usd",
-    "llm_seconds", "n_llm_calls", "n_tool_calls",
+    "llm_seconds", "n_llm_calls", "n_tool_calls", "tool_calls_json",
     "agent_seconds", "total_seconds", "env_setup_seconds",
     "started_at", "finished_at", "error", "reward", "response_text", "ingested_at",
 ]

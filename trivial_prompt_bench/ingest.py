@@ -29,21 +29,28 @@ def _timing_duration(timing: TimingInfo | None) -> float | None:
     return _duration_seconds(timing.started_at, timing.finished_at)
 
 
-def count_tool_calls(trial_dir: Path) -> int | None:
-    """Count tool calls the agent made, from the ATIF trajectory in agent/trajectory.json.
+def extract_tool_calls(trial_dir: Path) -> tuple[int | None, str | None]:
+    """From the ATIF trajectory (agent/trajectory.json), return (count, json_list).
 
-    Sums ``tool_calls`` across all steps (includes real commands like ``bash_command``
-    plus the agent's ``mark_task_complete`` marker). Returns None when there's no
-    trajectory (e.g. HiAgent/mock runs, which don't produce one).
+    The list is the agent's tool calls in order — each ``{"fn": <function_name>,
+    "cmd": <shell command or "">}`` — so downstream analysis can see *what* the agent
+    did, not just how many calls. Returns (None, None) when there's no trajectory
+    (e.g. HiAgent/mock runs).
     """
     traj = trial_dir / "agent" / "trajectory.json"
     if not traj.exists():
-        return None
+        return None, None
     try:
         data = json.loads(traj.read_text())
     except Exception:
-        return None
-    return sum(len(step.get("tool_calls") or []) for step in data.get("steps", []))
+        return None, None
+    calls = []
+    for step in data.get("steps", []):
+        for tc in step.get("tool_calls") or []:
+            args = tc.get("arguments") or {}
+            cmd = (args.get("keystrokes") or args.get("command") or "").strip()
+            calls.append({"fn": tc.get("function_name"), "cmd": cmd[:500]})
+    return len(calls), json.dumps(calls)
 
 
 def trial_to_row(result: TrialResult, job_name: str, prompt_override: str | None = None) -> dict:
@@ -144,7 +151,7 @@ def ingest_job(job_dir: Path, db_path: Path, prompt_override: str | None = None)
                 print(f"  skip {path}: {exc}")
                 continue
             row = trial_to_row(result, job_name, prompt_override)
-            row["n_tool_calls"] = count_tool_calls(path.parent)
+            row["n_tool_calls"], row["tool_calls_json"] = extract_tool_calls(path.parent)
             db.upsert_run(conn, row)
             written += 1
         conn.commit()

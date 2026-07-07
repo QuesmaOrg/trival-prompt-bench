@@ -100,7 +100,17 @@ def main() -> None:
         which = "mock_list" if args.mock else "list"
         sys.exit(f"No models configured under [models].{which} in {args.config}")
 
-    tasks = args.task if args.task else discover_tasks()
+    # Task selection: explicit --task wins; else the configured [bench].tasks set;
+    # an empty configured list means "every task under tasks/".
+    if args.task:
+        tasks = args.task
+    elif cfg.run_tasks:
+        tasks = [TASKS_DIR / name for name in cfg.run_tasks]
+        missing = [str(t) for t in tasks if not (t / "task.toml").exists()]
+        if missing:
+            sys.exit(f"Configured [bench].tasks not found: {', '.join(missing)}")
+    else:
+        tasks = discover_tasks()
     if not tasks:
         sys.exit(f"No tasks found under {TASKS_DIR}/ (need a <name>/task.toml).")
 
@@ -156,11 +166,11 @@ def main() -> None:
     # --mock (no real failures worth analyzing, and mocks never error).
     if not args.mock:
         try:
-            from trivial_prompt_bench.analyze import generate_failure_analyses
-            n = generate_failure_analyses(args.db, cfg.analysis_model, args.env_file)
-            print(f"Failure analysis: wrote {n} note(s)." if n else "Failure analysis: no failures.")
+            from trivial_prompt_bench.analyze import generate_analyses
+            n = generate_analyses(args.db, cfg.analysis_model, args.env_file)
+            print(f"Analysis: wrote {n} per-(task,model) note(s).")
         except Exception as exc:
-            print(f"Failure analysis skipped: {exc}")
+            print(f"Analysis skipped: {exc}")
 
     print("Run `make report` (or `make report-html`) to see results.")
 

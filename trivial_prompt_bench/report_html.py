@@ -101,6 +101,15 @@ _TEMPLATE = r"""<!doctype html>
              padding: 12px 16px; margin: -8px 0 22px; font-size: 13px;
              color: var(--text-secondary); line-height: 1.5; }
   .failure b { color: var(--text-primary); }
+  .failure .fa-head { margin-bottom: 8px; }
+  details.analysis { background: var(--surface); border: 1px solid var(--border);
+             border-radius: 10px; padding: 10px 16px; margin: -8px 0 12px;
+             font-size: 13px; color: var(--text-secondary); }
+  details.analysis > summary, .failure details > summary {
+             cursor: pointer; color: var(--text-primary); font-weight: 600; }
+  .failure details > summary { font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .amodel { margin: 10px 0 0; line-height: 1.5; }
+  .amodel b { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -226,12 +235,39 @@ function renderTask(container, task, showTime) {
   tableCard.appendChild(tbl);
   container.appendChild(tableCard);
 
-  // --- failure analysis (below the table, only if this task had failures) ---
-  if (task.analysis) {
-    const fa = el("div", "failure");
-    fa.innerHTML = "<b>Failure analysis</b> <span class='note'>" + task.n_failures +
-      " failed</span><br>" + task.analysis;
-    container.appendChild(fa);
+  // --- analysis: tool usage (folded, grouped by model) + failure modes ---
+  const arows = task.analysis || [];
+  const short = m => m.split("/").slice(-1)[0];
+
+  const withTools = arows.filter(a => a.tool_usage);
+  if (withTools.length) {
+    const d = el("details", "analysis");
+    d.innerHTML = "<summary>🔧 Tool usage — what the agent did <span class='note'>("
+      + withTools.length + " models)</span></summary>";
+    for (const a of withTools) {
+      const row = el("div", "amodel");
+      row.innerHTML = "<b>" + short(a.model) + "</b> " + a.tool_usage;
+      d.appendChild(row);
+    }
+    container.appendChild(d);
+  }
+
+  const withFails = arows.filter(a => a.failure_summary);
+  if (withFails.length) {
+    const box = el("div", "failure");
+    box.innerHTML = "<div class='fa-head'><b>Failure modes</b> <span class='note'>by model</span></div>";
+    for (const a of withFails) {
+      const row = el("div", "amodel");
+      row.innerHTML = "<b>" + short(a.model) + "</b> <span class='note'>" + a.n_failures +
+        "/" + a.n_runs + " failed</span> — " + a.failure_summary;
+      if (a.failure_details) {
+        const dd = el("details");
+        dd.innerHTML = "<summary>details</summary>" + a.failure_details;
+        row.appendChild(dd);
+      }
+      box.appendChild(row);
+    }
+    container.appendChild(box);
   }
 }
 
@@ -291,8 +327,11 @@ def render_html(tasks, cfg, generated_at: str, analyses: dict | None = None) -> 
             "task": t.task,
             "prompt": t.prompt or "",
             "models": [_model_dict(s) for s in t.models],
-            "analysis": (analyses.get(t.task) or {}).get("analysis"),
-            "n_failures": (analyses.get(t.task) or {}).get("n_failures"),
+            # per-model analysis, in the same model order as the table
+            "analysis": [
+                {"model": s.model, **(analyses.get(t.task, {}).get(s.model) or {})}
+                for s in t.models
+            ],
         }
         for t in tasks
     ]
