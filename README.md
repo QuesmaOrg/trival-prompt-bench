@@ -1,7 +1,8 @@
 # trivial-prompt-bench — what a trivial LLM request really costs
 
 A tiny cost/latency benchmark on the [Harbor](https://github.com/harbor-framework/harbor)
-framework. It sends a trivial prompt to a set of models and prices each run as:
+framework. It runs a trivial prompt through a terminal agent (Terminus) across many
+models (routed via OpenRouter) and prices each run as:
 
 ```
 total_cost = LLM API cost + user waiting cost
@@ -28,160 +29,108 @@ committed in the repo (one bar graph per task, LLM cost by default with a toggle
 >
 > Or regenerate it fresh from the data with `make report-html`.
 
-Latest run — 4 Anthropic models, 5 runs each, 4 tasks = **80 agentic trials** via the
-Terminus agent, all in the same git-repo environment, salary $120k/yr = $0.016026/sec.
-Columns: `err` = failed runs (excluded from averages), `tools` = avg tool calls,
-`lat` = transcript LLM latency, `total` = LLM + waiting cost per run.
+Latest run — **14 models across 6 providers** (Anthropic, OpenAI, Google, xAI, and the
+Chinese labs DeepSeek/Alibaba/Moonshot/Zhipu/MiniMax), all via OpenRouter, 5 runs each
+on 4 tasks = **280 agentic trials** through the Terminus agent in an identical git-repo
+environment. Salary $120k/yr = $0.016026/sec. `err` = failed runs (excluded from
+averages); `total $/run` = LLM cost + waiting cost; latency is the transcript LLM time.
 
-### `commit` — prompt "commit" (graded: **100% pass, all models**)
-| Model | err | tools | avg lat | total $/run |
-|---|--:|--:|--:|--:|
-| claude-haiku-4-5 | 0 | 4.6 | 6.8s | **$0.1150** |
-| claude-sonnet-5  | 0 | 9.6 | 15.3s | **$0.2796** |
-| claude-opus-4-8  | 0 | 8.6 | 21.6s | **$0.4070** |
-| claude-fable-5   | 0 | 7.2 | 31.1s | **$0.5856** |
+### Model leaderboard (averaged across the 4 tasks, cheapest first)
+| Model | err/20 | avg latency | avg total $/run |
+|---|--:|--:|--:|
+| openai/gpt-5.4-mini | 0 | 9.3s | **$0.155** |
+| openai/gpt-5.5 | 0 | 11.8s | **$0.230** |
+| x-ai/grok-4.3 | 0 | 17.6s | **$0.288** |
+| google/gemini-3.1-pro-preview | 5 | 19.5s | **$0.332** |
+| anthropic/claude-fable-5 | 5 | 20.8s | **$0.383** |
+| anthropic/claude-haiku-4.5 | 4 | 23.5s | **$0.405** |
+| minimax/minimax-m3 | 6 | 26.7s | **$0.431** |
+| google/gemini-3.5-flash | 1 | 25.8s | **$0.506** |
+| deepseek/deepseek-v4-pro | 4 | 31.2s | **$0.507** |
+| z-ai/glm-5.2 | 1 | 36.5s | **$0.594** |
+| anthropic/claude-opus-4.8 | 0 | 32.1s | **$0.594** |
+| moonshotai/kimi-k2.6 | 4 | 37.6s | **$0.619** |
+| anthropic/claude-sonnet-5 | 1 | 49.6s | **$0.854** |
+| qwen/qwen3.7-max | 1 | 54.7s | **$0.897** |
 
-### `hi` — prompt "Hi"
-| Model | err | tools | avg lat | total $/run |
-|---|--:|--:|--:|--:|
-| claude-fable-5   | 0 | 2.8 | 10.7s | **$0.2037** |
-| claude-opus-4-8  | 0 | 10.2 | 23.4s | **$0.4369** |
-| claude-sonnet-5  | 0 | 32.2 | 45.5s | **$0.8300** |
-| claude-haiku-4-5 | 4 | 22.0 | 48.4s | **$0.8344** |
+### Per-task spend & reliability
+| Task | prompt | spend | errors | cheapest | priciest |
+|---|---|--:|--:|---|---|
+| `commit` | "commit" (graded, 100% pass) | $22.22 | 0 | gpt-5.4-mini $0.126 | fable-5 $0.673 |
+| `hi` | "Hi" | $24.21 | 8 | gpt-5.4-mini $0.076 | sonnet-5 $0.841 |
+| `thank-you` | "Thank you" | $26.79 | 3 | gpt-5.4-mini $0.053 | qwen3.7-max $1.221 |
+| `wtf` | "WTF" | $42.15 | 21 | grok-4.3 $0.338 | qwen3.7-max $1.388 |
 
-### `thank-you` — prompt "Thank you"
-| Model | err | tools | avg lat | total $/run |
-|---|--:|--:|--:|--:|
-| claude-haiku-4-5 | 2 | 5.7 | 12.4s | **$0.2119** |
-| claude-fable-5   | 0 | 2.0 | 12.3s | **$0.2252** |
-| claude-opus-4-8  | 0 | 9.6 | 26.5s | **$0.4925** |
-| claude-sonnet-5  | 0 | 15.6 | 33.7s | **$0.6089** |
-
-### `wtf` — prompt "WTF"
-| Model | err | tools | avg lat | total $/run |
-|---|--:|--:|--:|--:|
-| claude-haiku-4-5 | 0 | 18.0 | 21.2s | **$0.3659** |
-| claude-sonnet-5  | 0 | 33.4 | 54.2s | **$0.9843** |
-| claude-opus-4-8  | 0 | 23.0 | 55.0s | **$1.0255** |
-| claude-fable-5   | 5 | — | — | **failed 5/5** |
-
-**Overall spend across all 80 runs: $34.27**
+**Overall spend across all 280 runs: $115.37**
 
 ### What the numbers say
-- **The prompt is the cost driver.** Same environment, same models — only the prompt
-  differs, yet total cost per run swings **~10×** (from `commit` at $0.12 to `wtf` at
-  $1.03). A clear instruction (`commit`) is cheap and 100% reliable; a bare
-  interjection (`WTF`) makes the agent thrash.
-- **Under-specified prompts blow up.** `hi`/`wtf` drop the agent into a repo with a
-  pending change and no clear task, so it explores: Sonnet spent **32 tool calls / 45s**
-  on "Hi". More tool calls → more latency → more cost.
-- **Latency still dominates** the bill (waiting cost ≫ token cost), so the ranking is
-  essentially a latency/tool-call ranking.
-- **Trivial prompts are flaky as agent tasks.** Haiku errored 4/5 on "Hi" and 2/5 on
-  "Thank you"; **Fable failed all 5 "WTF" runs**. These are agent failures, not bench
-  bugs (see the `err` column).
+- **GPT-5.4-mini wins outright** — cheapest and fastest overall (9.3s), zero errors,
+  and the cheapest model on *every* task. GPT-5.5 and Grok-4.3 follow.
+- **Latency dominates the bill** (waiting cost ≫ token cost), so the ranking is
+  essentially a speed ranking: the slow frontier models (qwen3.7-max 55s, sonnet-5 50s)
+  are the most expensive despite reasonable token prices.
+- **Prompt clarity drives cost and reliability.** `commit` (a clear instruction) had
+  **0 errors** across all 14 models and was the cheapest task; `wtf` (a bare
+  interjection) had **21/70 failures** and cost nearly 2× as much — models thrash or
+  time out when there's nothing concrete to do.
+- **Reliability varies widely.** gpt-5.4-mini, gpt-5.5, grok-4.3, and opus-4.8 had zero
+  errors; minimax-m3 (6), gemini-3.1-pro (5), and fable-5 (5) were the most failure-prone.
 
 > Numbers are a point-in-time sample; network/load and agent nondeterminism shift them
-> run to run (small n=5, and errored runs are excluded from averages). The salary
-> assumption drives the totals — retune `config.toml [cost]` and re-run `make
-> report-html` (no re-benchmarking needed; raw sqlite data is assumption-free).
+> run to run (n=5 per task, errored runs excluded from averages). The salary assumption
+> drives the totals — retune `config.toml [cost]` and re-run `make report-html` (no
+> re-benchmarking needed; raw sqlite data is assumption-free). `report.html` also shows,
+> per task, **what each model actually did** with its tools and **why runs failed**.
 
 ## Run it yourself
 
 ```bash
 make setup                     # .venv (uv, Python 3.12) + harbor
-cp .env.example .env           # add ANTHROPIC_API_KEY (+ others)
-$EDITOR config.toml            # pick models (the "test suite") + salary
-make bench                     # run every task × every model, store to sqlite
-make report-html               # regenerate report.html
+cp .env.example .env           # add OPENROUTER_API_KEY
+$EDITOR config.toml            # pick models (the "test suite"), tasks + salary
+make all                       # bench (run + ingest + failure analysis) + report.html
 ```
 
-**Requirements:** Docker running (Harbor builds a container per trial) and API keys
-for the providers you benchmark. No keys? `make smoke` runs the whole pipeline offline
-with `mock/*` models.
+**Requirements:** Docker running (Harbor builds a container per trial) and an
+`OPENROUTER_API_KEY` in `.env` (models are `openrouter/…` slugs). No key? `make smoke`
+runs the whole pipeline offline with `mock/*` models.
 
 ## How it works
 
 ```
-tasks/<name>/          Harbor task — instruction.md is the prompt, verifier disabled
-trivial_prompt_bench/agent.py      HiAgent: a custom Harbor agent making ONE LiteLLM call
-trivial_prompt_bench/run.py        Runs every task under tasks/ across the model list, then ingests
-trivial_prompt_bench/ingest.py     Parses jobs/<job>/<trial>/result.json → sqlite
-trivial_prompt_bench/report.py     Text report + writes report.html / report.txt
-trivial_prompt_bench/report_html.py Self-contained HTML: one stacked-bar graph per task
-data/trivial_prompt_bench.db       sqlite results (git-ignored)
+tasks/<name>/          Harbor task — instruction.md is the prompt; all tasks share the
+                       same git-repo environment, so only the prompt differs
+trivial_prompt_bench/run.py         Runs the configured tasks across the models, then ingests + analyzes
+trivial_prompt_bench/ingest.py      Parses jobs/<job>/<trial>/result.json → sqlite
+trivial_prompt_bench/analyze.py     Per-(task,model) tool-usage + failure analysis (one Claude call each)
+trivial_prompt_bench/report.py      Text report + writes report.html / report.txt
+trivial_prompt_bench/report_html.py Self-contained HTML: one graph per task
+trivial_prompt_bench/agent.py       HiAgent — single-LLM-call agent, used only for `make smoke`
+data/trivial_prompt_bench.db        sqlite results (committed)
 report.html            Committed report artifact
 ```
 
-## Contributing a task
-
-Tasks are the unit of contribution. **Every task shares the same environment and
-differs only in its prompt** — that's the whole design: the prompt is the one variable,
-so differences in cost/latency are attributable to the prompt (and the model), not the
-setup.
-
-### Task structure
-
-```
-tasks/<name>/
-├── task.toml              # name = "trivial-prompt-bench/<name>" (+ optional [metadata])
-├── instruction.md         # THE PROMPT — the only file you change for a new task
-├── environment/
-│   ├── Dockerfile         # identical across tasks — do not edit (keeps tasks comparable)
-│   └── build_repo.sh      # identical — builds the shared git project the agent runs in
-├── tests/test.sh          # verifier; trivial tasks use the always-pass one
-└── solution/solve.sh      # reference ("oracle") solution
-```
-
-Every task's container is the same: a small git repo with history and one uncommitted
-change. The agent (Terminus by default) is handed your prompt inside that repo. The
-runner **auto-discovers** any `tasks/*/task.toml`, so no code changes are needed.
-
-### Add a task (clone the `hi` task, change the prompt, open a PR)
-
-```bash
-# 1. Clone the simplest task
-cp -r tasks/hi tasks/goodbye
-
-# 2. Change the prompt — this is the only content that differs between trivial tasks
-echo "Goodbye" > tasks/goodbye/instruction.md
-
-# 3. Rename the task so it's unique
-#    edit tasks/goodbye/task.toml -> name = "trivial-prompt-bench/goodbye"
-
-# 4. Leave environment/ and tests/ untouched (shared setup, always-pass verifier)
-
-# 5. Run it and eyeball the report
-make bench          # discovers goodbye automatically, runs it across all models
-make report-html    # regenerate report.html — a new graph appears for your task
-
-# 6. Commit and open a PR
-git checkout -b task/goodbye
-git add tasks/goodbye report.html
-git commit -m "Add 'goodbye' task"
-git push -u origin task/goodbye
-gh pr create --fill
-```
-
-That's it for a trivial-prompt task. If your task needs the agent to *do* something
-(like `commit` does), set `agent`/`verify` in `task.toml [metadata]` and write a real
-`tests/test.sh` — see `tasks/commit/` as the worked example.
+Every task runs through the **Terminus** agent, so the measured cost/latency includes
+the whole agent loop (agent overhead), even for a one-word prompt. Which tasks run by
+default is set in `config.toml [bench].tasks`; the rest stay in the repo and run on
+demand (`python -m trivial_prompt_bench.run --task tasks/<name>`).
 
 ## Make targets
 
 | Target | Does |
 |---|---|
 | `make setup` | Create the venv and install harbor + this package |
+| `make all` | Full pipeline: bench (run + ingest + failure analysis) + `report.html` |
 | `make smoke` | End-to-end run with `mock/*` models — offline, no keys |
-| `make bench` | Run every task × every model, ingest, and report |
+| `make bench` | Run the configured tasks × models, ingest, analyze, and report |
+| `make analyze` | (Re)generate the per-(task,model) analysis from existing results |
 | `make report` | Print the text report from sqlite |
-| `make report-html` | Write `report.html` (one graph per task) |
-| `make report-file` | Write `report.txt` |
+| `make report-html` | Write `report.html` |
 | `make clean` | Remove `jobs/` and the sqlite database |
 
 ## Notes
 
-- Model names are LiteLLM identifiers (`provider/model`). If a model is missing from
-  LiteLLM's pricing table the run still records latency/tokens, but `LLM $/run` is blank.
+- Models are `openrouter/<slug>` identifiers; token cost comes from OpenRouter's
+  returned `response_cost`, so it works even for models LiteLLM's price map doesn't know.
 - Python is pinned to 3.12; some Harbor dependencies lack 3.14 wheels.
 - See [`CLAUDE.md`](CLAUDE.md) for implementation notes.
