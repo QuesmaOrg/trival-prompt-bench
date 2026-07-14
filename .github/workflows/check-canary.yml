@@ -1,0 +1,22 @@
+name: Check benchmark canaries
+
+on:
+  pull_request:
+    paths:
+      - "tasks/**"
+      - "scripts/check_canary.sh"
+      - ".github/workflows/check-canary.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tasks/**"
+      - "scripts/check_canary.sh"
+      - ".github/workflows/check-canary.yml"
+
+jobs:
+  check-canaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate task canary coverage
+        run: bash scripts/check_canary.sh
